@@ -14,6 +14,21 @@ const create = async (clientId, data) => {
     throw error;
   }
 
+  const duplicate = await db.query(
+    `SELECT id FROM bookings
+     WHERE professional_id = $1
+       AND scheduled_date = $2
+       AND scheduled_time = $3
+       AND status NOT IN ('rejected', 'cancelled')`,
+    [professional_id, scheduled_date, scheduled_time]
+  );
+
+  if (duplicate.rows.length > 0) {
+    const error = new Error('El profesional ya tiene una reserva en ese horario');
+    error.status = 409;
+    throw error;
+  }
+
   const total_amount = serviceResult.rows[0].price;
 
   const result = await db.query(
