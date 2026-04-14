@@ -1,5 +1,12 @@
 const db = require('../../config/database');
 
+const normalize = (str) => {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+};
+
 const getAll = async ({ category, search }) => {
   let query = `
     SELECT
@@ -33,8 +40,11 @@ const getAll = async ({ category, search }) => {
   }
 
   if (search) {
-    params.push(`%${search}%`);
-    query += ` AND (s.title ILIKE $${params.length} OR s.description ILIKE $${params.length})`;
+    params.push(`%${normalize(search)}%`);
+    query += ` AND (
+      lower(unaccent(s.title)) LIKE $${params.length}
+      OR lower(unaccent(s.description)) LIKE $${params.length}
+    )`;
   }
 
   query += ` ORDER BY pp.rating DESC`;
