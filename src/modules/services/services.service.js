@@ -90,7 +90,7 @@ const getById = async (id) => {
 };
 
 const create = async (userId, data) => {
-  const { title, description, category_id, price_type, price, estimated_duration } = data;
+  const { title, description, category_id, category_slug, price_type, price, estimated_duration } = data;
 
   const profResult = await db.query(
     'SELECT id FROM professional_profiles WHERE user_id = $1',
@@ -105,11 +105,25 @@ const create = async (userId, data) => {
 
   const professionalId = profResult.rows[0].id;
 
+  let finalCategoryId = category_id;
+  if (!finalCategoryId && category_slug) {
+    const catResult = await db.query(
+      'SELECT id FROM categories WHERE slug = $1',
+      [category_slug]
+    );
+    if (catResult.rows.length === 0) {
+      const error = new Error('Categoría no encontrada');
+      error.status = 400;
+      throw error;
+    }
+    finalCategoryId = catResult.rows[0].id;
+  }
+
   const result = await db.query(
     `INSERT INTO services (professional_id, category_id, title, description, price_type, price, estimated_duration)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
-    [professionalId, category_id, title, description, price_type || 'fixed', price, estimated_duration]
+    [professionalId, finalCategoryId, title, description, price_type || 'fixed', price, estimated_duration]
   );
 
   return result.rows[0];
