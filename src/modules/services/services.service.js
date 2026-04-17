@@ -47,7 +47,11 @@ const getAll = async ({ category, search }) => {
     )`;
   }
 
-  query += ` ORDER BY pp.rating DESC`;
+  if (search && category) {
+    query += ` ORDER BY CASE WHEN c.slug = '${category}' THEN 0 ELSE 1 END, pp.rating DESC`;
+  } else {
+    query += ` ORDER BY pp.rating DESC`;
+  }
 
   const result = await db.query(query, params);
   return result.rows;
