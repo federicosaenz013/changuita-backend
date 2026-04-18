@@ -55,4 +55,13 @@ const getCategories = async (req, res, next) => {
   }
 };
 
-module.exports = { getAll, getById, create, update, remove, getCategories };
+const getMyServices = async (req, res, next) => {
+  try {
+    const services = await servicesService.getMyServices(req.user.id);
+    res.json({ services });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getAll, getById, create, update, remove, getCategories, getMyServices };

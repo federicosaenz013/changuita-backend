@@ -176,4 +176,26 @@ const getCategories = async () => {
   return result.rows;
 };
 
-module.exports = { getAll, getById, create, update, remove, getCategories };
+const getMyServices = async (userId) => {
+  const result = await db.query(
+    `SELECT
+      s.id,
+      s.title,
+      s.description,
+      s.price_type,
+      s.price,
+      s.estimated_duration,
+      s.is_active,
+      c.name AS category,
+      c.slug AS category_slug
+    FROM services s
+    JOIN categories c ON s.category_id = c.id
+    JOIN professional_profiles pp ON s.professional_id = pp.id
+    WHERE pp.user_id = $1
+    ORDER BY s.created_at DESC`,
+    [userId]
+  );
+  return result.rows;
+};
+
+module.exports = { getAll, getById, create, update, remove, getCategories, getMyServices };
