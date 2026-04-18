@@ -1,8 +1,9 @@
-const express = require('express');
-const router  = express.Router();
+const express = require("express");
+const router = express.Router();
+const { createPreference, webhook } = require("./payments.controller");
+const { authenticateToken } = require("../../middleware/auth");
 
-router.get('/test', (req, res) => {
-  res.json({ message: 'Users module funcionando ✅' });
-});
+router.post("/create-preference", authenticateToken, createPreference);
+router.post("/webhook", webhook);
 
 module.exports = router;
