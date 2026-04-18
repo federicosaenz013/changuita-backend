@@ -1,9 +1,8 @@
 const admin = require('firebase-admin');
-const path = require('path');
 
 // Inicializar Firebase Admin solo una vez
 if (!admin.apps.length) {
-  const serviceAccount = require(path.join(__dirname, '../../../firebase-service-account.json'));
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
   
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
