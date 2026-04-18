@@ -34,6 +34,26 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+app.get('/setup/push-tokens', async (req, res) => {
+  const db = require('./config/database');
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS push_tokens (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token TEXT NOT NULL,
+        platform VARCHAR(10) DEFAULT 'expo',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(user_id, token)
+      );
+    `);
+    res.json({ ok: true, message: 'Tabla push_tokens creada correctamente' });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
 app.use(require('./middleware/errorHandler'));
 
 module.exports = app;
