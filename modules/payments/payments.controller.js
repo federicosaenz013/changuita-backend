@@ -53,4 +53,3 @@ const webhook = async (req, res) => {
 };
 
 module.exports = { createPreference, webhook };
-
