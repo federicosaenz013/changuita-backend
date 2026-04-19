@@ -5,7 +5,7 @@ const { sendNotification } = require('./notifications.service');
 const saveToken = async (req, res) => {
   try {
     const { token, platform } = req.body;
-    const userId = req.user.userId;
+    const const userId = req.user.userId || req.user.id;
 
     if (!token) {
       return res.status(400).json({ error: 'Token requerido' });
