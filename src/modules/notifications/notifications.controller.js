@@ -1,11 +1,10 @@
 const db = require('../../config/database');
 const { sendNotification } = require('./notifications.service');
 
-// Guardar o actualizar token de notificación
 const saveToken = async (req, res) => {
   try {
     const { token, platform } = req.body;
-    const userId = req.user.userId || req.user.id;
+    const userId = req.user.id;
 
     if (!token) {
       return res.status(400).json({ error: 'Token requerido' });
@@ -25,10 +24,9 @@ const saveToken = async (req, res) => {
   }
 };
 
-// Enviar notificación de prueba
 const testNotification = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = req.user.id;
 
     const result = await db.query(
       'SELECT token FROM push_tokens WHERE user_id = $1 LIMIT 1',

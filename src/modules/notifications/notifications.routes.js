@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { saveToken, testNotification } = require('./notifications.controller');
-const { authenticateToken } = require('../../middleware/auth');
+const { authenticate } = require('../../middleware/auth');
 
-router.post('/token', authenticateToken, saveToken);
-router.post('/test', authenticateToken, testNotification);
+router.post('/token', authenticate, saveToken);
+router.post('/test', authenticate, testNotification);
 
 module.exports = router;
