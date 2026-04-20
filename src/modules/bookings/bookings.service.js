@@ -3,6 +3,7 @@ const db = require('../../config/database');
 const create = async (clientId, data) => {
   const { service_id, professional_id, scheduled_date, scheduled_time, location_text, notes } = data;
 
+  // Validar que el servicio existe
   const serviceResult = await db.query(
     'SELECT price FROM services WHERE id = $1 AND is_active = true',
     [service_id]
@@ -11,6 +12,22 @@ const create = async (clientId, data) => {
   if (serviceResult.rows.length === 0) {
     const error = new Error('Servicio no encontrado');
     error.status = 404;
+    throw error;
+  }
+
+  // Validar que no haya reserva duplicada en ese horario
+  const conflict = await db.query(
+    `SELECT id FROM bookings
+     WHERE professional_id = $1
+       AND scheduled_date = $2
+       AND scheduled_time = $3
+       AND status IN ('pending', 'accepted')`,
+    [professional_id, scheduled_date, scheduled_time]
+  );
+
+  if (conflict.rows.length > 0) {
+    const error = new Error('El profesional ya tiene una reserva en ese horario. Por favor elegí otro.');
+    error.status = 409;
     throw error;
   }
 
@@ -68,6 +85,7 @@ const getById = async (bookingId, userId) => {
       s.price_type,
       u_client.name AS client_name,
       u_client.profile_photo AS client_photo,
+      u_client.phone AS client_phone,
       u_prof.name AS professional_name,
       u_prof.profile_photo AS professional_photo
     FROM bookings b
@@ -88,6 +106,14 @@ const getById = async (bookingId, userId) => {
 };
 
 const updateStatus = async (bookingId, userId, status) => {
+  // Solo permitir estados válidos para el profesional
+  const validStatuses = ['accepted', 'rejected', 'completed'];
+  if (!validStatuses.includes(status)) {
+    const error = new Error('Estado no válido');
+    error.status = 400;
+    throw error;
+  }
+
   const result = await db.query(
     `UPDATE bookings SET status = $1, updated_at = NOW()
      WHERE id = $2 AND professional_id = $3
