@@ -8,6 +8,8 @@ const getAll = async ({ category, lat, lng, radius = 10 }) => {
       u.profile_photo,
       pp.description,
       pp.location_text,
+      pp.latitude,
+      pp.longitude,
       pp.hourly_rate,
       pp.rating,
       pp.reviews_count,
