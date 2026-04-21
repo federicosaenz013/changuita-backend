@@ -41,16 +41,16 @@ app.get('/setup/fix-ratings', async (req, res) => {
     await db.query(`
       UPDATE professional_profiles pp
       SET
-        rating = (
+        rating = COALESCE((
           SELECT ROUND(AVG(r.rating)::numeric, 2)
           FROM reviews r
           WHERE r.professional_id = pp.user_id
-        ),
-        reviews_count = (
+        ), 0),
+        reviews_count = COALESCE((
           SELECT COUNT(*)
           FROM reviews r
           WHERE r.professional_id = pp.user_id
-        ),
+        ), 0),
         updated_at = NOW()
     `);
     res.json({ ok: true, message: 'Ratings actualizados correctamente' });
