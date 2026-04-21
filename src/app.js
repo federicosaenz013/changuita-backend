@@ -35,7 +35,29 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-
+app.get('/setup/fix-ratings', async (req, res) => {
+  const db = require('./config/database');
+  try {
+    await db.query(`
+      UPDATE professional_profiles pp
+      SET
+        rating = (
+          SELECT ROUND(AVG(r.rating)::numeric, 2)
+          FROM reviews r
+          WHERE r.professional_id = pp.user_id
+        ),
+        reviews_count = (
+          SELECT COUNT(*)
+          FROM reviews r
+          WHERE r.professional_id = pp.user_id
+        ),
+        updated_at = NOW()
+    `);
+    res.json({ ok: true, message: 'Ratings actualizados correctamente' });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
 
 app.use(require('./middleware/errorHandler'));
 
