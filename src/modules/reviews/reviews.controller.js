@@ -1,0 +1,21 @@
+const reviewsService = require('./reviews.service');
+
+const create = async (req, res, next) => {
+  try {
+    const review = await reviewsService.create(req.user.id, req.body);
+    res.status(201).json({ message: 'Reseña enviada correctamente', review });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const getByProfessional = async (req, res, next) => {
+  try {
+    const reviews = await reviewsService.getByProfessional(req.params.professionalId);
+    res.json({ reviews });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { create, getByProfessional };
