@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eliminar cuenta — Changuita</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, sans-serif; background: #f0f7ff; color: #1e3a5f; }
+    .header { background: #8ABAD3; padding: 24px; text-align: center; }
+    .header h1 { color: white; font-size: 24px; }
+    .header p { color: rgba(255,255,255,0.85); margin-top: 6px; font-size: 14px; }
+    .container { max-width: 600px; margin: 32px auto; padding: 0 16px; }
+    .card { background: white; border-radius: 16px; padding: 28px; margin-bottom: 16px; border: 1px solid #d0e8f5; }
+    h2 { font-size: 18px; margin-bottom: 12px; color: #1e3a5f; }
+    p { font-size: 14px; line-height: 1.6; color: #4b5675; margin-bottom: 10px; }
+    ul { padding-left: 20px; margin-bottom: 10px; }
+    li { font-size: 14px; color: #4b5675; margin-bottom: 6px; line-height: 1.6; }
+    .steps { counter-reset: steps; }
+    .step { display: flex; gap: 14px; margin-bottom: 16px; align-items: flex-start; }
+    .step-num { background: #8ABAD3; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; }
+    .step-text { font-size: 14px; color: #4b5675; line-height: 1.6; padding-top: 4px; }
+    .email-box { background: #f0f7ff; border: 1px solid #d0e8f5; border-radius: 10px; padding: 14px; text-align: center; margin-top: 12px; }
+    .email-box a { color: #3b82c4; font-weight: 600; text-decoration: none; font-size: 15px; }
+    .warning { background: #fff8e1; border: 1px solid #ffe082; border-radius: 10px; padding: 14px; margin-top: 12px; }
+    .warning p { color: #7a5c00; margin: 0; }
+    .footer { text-align: center; font-size: 12px; color: #8a9bb5; margin: 32px 0; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>Changuita</h1>
+    <p>Solicitud de eliminación de cuenta</p>
+  </div>
+
+  <div class="container">
+
+    <div class="card">
+      <h2>¿Cómo eliminar tu cuenta?</h2>
+      <p>Podés solicitar la eliminación de tu cuenta y todos tus datos personales enviando un correo electrónico a nuestro equipo. Procesamos todas las solicitudes en un plazo máximo de 30 días.</p>
+
+      <div class="steps" style="margin-top: 16px;">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-text">Enviá un correo electrónico desde la dirección de email asociada a tu cuenta de Changuita.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-text">En el asunto escribí: <strong>"Solicitud de eliminación de cuenta"</strong></div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-text">En el cuerpo del mensaje indicá tu nombre completo y confirmá que querés eliminar tu cuenta permanentemente.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-text">Recibirás una confirmación dentro de las 48 horas hábiles.</div>
+        </div>
+      </div>
+
+      <div class="email-box">
+        <p style="margin-bottom: 6px; font-size: 13px;">Enviá tu solicitud a:</p>
+        <a href="mailto:soporte@changuita.app">soporte@changuita.app</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>¿Qué datos se eliminan?</h2>
+      <p>Al eliminar tu cuenta se borran permanentemente:</p>
+      <ul>
+        <li>Tu perfil y datos personales (nombre, email, teléfono)</li>
+        <li>Tu historial de reservas y conversaciones</li>
+        <li>Tus reseñas y calificaciones</li>
+        <li>Tu perfil profesional y servicios publicados (si sos profesional)</li>
+      </ul>
+      <div class="warning">
+        <p>⚠️ Esta acción es irreversible. Una vez eliminada la cuenta no es posible recuperar los datos.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Datos que se conservan</h2>
+      <p>Por obligaciones legales y fiscales, podemos conservar durante hasta 5 años:</p>
+      <ul>
+        <li>Registros de transacciones y pagos</li>
+        <li>Información necesaria para resolver disputas pendientes</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <p>© 2026 Changuita — Todos los derechos reservados</p>
+  </div>
+
+</body>
+</html>
