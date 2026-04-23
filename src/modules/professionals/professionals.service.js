@@ -56,7 +56,7 @@ const getById = async (id) => {
       pp.portfolio_images,
       pp.is_available,
       pp.verification_status,
-      pp.availability_schedule
+      COALESCE(pp.availability, pp.availability_schedule) AS availability
     FROM professional_profiles pp
     JOIN users u ON pp.user_id = u.id
     WHERE u.id = $1 AND u.is_active = true`,
@@ -118,21 +118,22 @@ const updateProfile = async (userId, data) => {
     latitude,
     longitude,
     hourly_rate,
-    availability_schedule,
+    availability,
   } = data;
 
   const result = await db.query(
     `UPDATE professional_profiles SET
-      description           = COALESCE($1, description),
-      location_text         = COALESCE($2, location_text),
-      latitude              = COALESCE($3, latitude),
-      longitude             = COALESCE($4, longitude),
-      hourly_rate           = COALESCE($5, hourly_rate),
-      availability_schedule = COALESCE($6, availability_schedule),
-      updated_at            = NOW()
+      description    = COALESCE($1, description),
+      location_text  = COALESCE($2, location_text),
+      latitude       = COALESCE($3, latitude),
+      longitude      = COALESCE($4, longitude),
+      hourly_rate    = COALESCE($5, hourly_rate),
+      availability   = COALESCE($6, availability),
+      updated_at     = NOW()
     WHERE user_id = $7
     RETURNING *`,
-    [description, location_text, latitude, longitude, hourly_rate, availability_schedule, userId]
+    [description, location_text, latitude, longitude, hourly_rate,
+     availability ? JSON.stringify(availability) : null, userId]
   );
 
   if (result.rows.length === 0) {
