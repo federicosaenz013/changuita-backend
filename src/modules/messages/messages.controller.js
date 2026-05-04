@@ -9,4 +9,13 @@ const getByBooking = async (req, res, next) => {
   }
 };
 
-module.exports = { getByBooking };
+const getUnreadCount = async (req, res, next) => {
+  try {
+    const count = await messagesService.getUnreadCount(req.user.id);
+    res.json({ count });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { getByBooking, getUnreadCount };

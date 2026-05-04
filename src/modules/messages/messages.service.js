@@ -38,4 +38,14 @@ const getByBooking = async (bookingId, userId) => {
   return result.rows;
 };
 
-module.exports = { getByBooking };
+const getUnreadCount = async (userId) => {
+  const result = await db.query(
+    `SELECT COUNT(*) AS count
+     FROM messages
+     WHERE receiver_id = $1 AND is_read = false`,
+    [userId]
+  );
+  return parseInt(result.rows[0].count, 10);
+};
+
+module.exports = { getByBooking, getUnreadCount };
