@@ -3,7 +3,6 @@ const db = require('../../config/database');
 const create = async (clientId, data) => {
   const { service_id, professional_id, scheduled_date, scheduled_time, location_text, notes } = data;
 
-  // Validar que el servicio existe
   const serviceResult = await db.query(
     'SELECT price FROM services WHERE id = $1 AND is_active = true',
     [service_id]
@@ -15,7 +14,6 @@ const create = async (clientId, data) => {
     throw error;
   }
 
-  // Validar que no haya reserva duplicada en ese horario
   const conflict = await db.query(
     `SELECT id FROM bookings
      WHERE professional_id = $1
@@ -63,7 +61,14 @@ const getByUser = async (userId, role) => {
       u_client.name AS client_name,
       u_client.profile_photo AS client_photo,
       u_prof.name AS professional_name,
-      u_prof.profile_photo AS professional_photo
+      u_prof.profile_photo AS professional_photo,
+      COALESCE((
+        SELECT COUNT(*)::int
+        FROM messages m
+        WHERE m.booking_id = b.id
+          AND m.receiver_id = $1
+          AND m.is_read = false
+      ), 0) AS unread_count
     FROM bookings b
     JOIN services s ON b.service_id = s.id
     JOIN users u_client ON b.client_id = u_client.id
@@ -106,7 +111,6 @@ const getById = async (bookingId, userId) => {
 };
 
 const updateStatus = async (bookingId, userId, status) => {
-  // Solo permitir estados válidos para el profesional
   const validStatuses = ['accepted', 'rejected', 'completed'];
   if (!validStatuses.includes(status)) {
     const error = new Error('Estado no válido');
