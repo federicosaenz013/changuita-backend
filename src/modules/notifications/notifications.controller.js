@@ -1,50 +1,89 @@
+const bookingsService = require('./bookings.service');
+const { sendNotification } = require('../notifications/notifications.service');
 const db = require('../../config/database');
-const { sendNotification } = require('./notifications.service');
 
-const saveToken = async (req, res) => {
+const create = async (req, res, next) => {
   try {
-    const { token, platform } = req.body;
-    const userId = req.user.id;
-
-    if (!token) {
-      return res.status(400).json({ error: 'Token requerido' });
-    }
-
-    await db.query(
-      `INSERT INTO push_tokens (user_id, token, platform)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (user_id, token) DO UPDATE SET updated_at = NOW()`,
-      [userId, token, platform || 'expo']
-    );
-
-    res.json({ ok: true, message: 'Token guardado' });
-  } catch (error) {
-    console.error('Error guardando token:', error.message);
-    res.status(500).json({ error: 'Error guardando token' });
+    const booking = await bookingsService.create(req.user.id, req.body);
+    res.status(201).json({ message: 'Reserva creada correctamente', booking });
+  } catch (err) {
+    next(err);
   }
 };
 
-const testNotification = async (req, res) => {
+const getByUser = async (req, res, next) => {
   try {
-    const userId = req.user.id;
-
-    const result = await db.query(
-      'SELECT token FROM push_tokens WHERE user_id = $1 LIMIT 1',
-      [userId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'No hay token registrado para este usuario' });
-    }
-
-    const token = result.rows[0].token;
-    await sendNotification(token, '🔔 Changuita', '¡Las notificaciones funcionan!', {});
-
-    res.json({ ok: true, message: 'Notificación enviada' });
-  } catch (error) {
-    console.error('Error enviando notificación de prueba:', error.message);
-    res.status(500).json({ error: 'Error enviando notificación' });
+    const bookings = await bookingsService.getByUser(req.user.id, req.user.role);
+    res.json({ bookings });
+  } catch (err) {
+    next(err);
   }
 };
 
-module.exports = { saveToken, testNotification };
+const getById = async (req, res, next) => {
+  try {
+    const booking = await bookingsService.getById(req.params.id, req.user.id);
+    res.json({ booking });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const accept = async (req, res, next) => {
+  try {
+    const booking = await bookingsService.updateStatus(req.params.id, req.user.id, 'accepted');
+    res.json({ message: 'Reserva aceptada', booking });
+    const tokenRes = await db.query('SELECT token FROM push_tokens WHERE user_id = $1 LIMIT 1', [booking.client_id]);
+    if (tokenRes.rows.length > 0) {
+      await sendNotification(tokenRes.rows[0].token, '✅ Reserva aceptada', 'Tu reserva fue aceptada por el profesional', {});
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+const reject = async (req, res, next) => {
+  try {
+    const booking = await bookingsService.updateStatus(req.params.id, req.user.id, 'rejected');
+    res.json({ message: 'Reserva rechazada', booking });
+    const tokenRes = await db.query('SELECT token FROM push_tokens WHERE user_id = $1 LIMIT 1', [booking.client_id]);
+    if (tokenRes.rows.length > 0) {
+      await sendNotification(tokenRes.rows[0].token, '❌ Reserva rechazada', 'Tu reserva fue rechazada por el profesional', {});
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+const complete = async (req, res, next) => {
+  try {
+    const booking = await bookingsService.updateStatus(req.params.id, req.user.id, 'completed');
+    res.json({ message: 'Reserva completada', booking });
+    const tokenRes = await db.query('SELECT token FROM push_tokens WHERE user_id = $1 LIMIT 1', [booking.client_id]);
+    if (tokenRes.rows.length > 0) {
+      await sendNotification(tokenRes.rows[0].token, '🎉 Trabajo completado', 'El profesional marcó el trabajo como completado', {});
+    }
+  } catch (err) {
+    next(err);
+  }
+};
+
+const cancel = async (req, res, next) => {
+  try {
+    const booking = await bookingsService.cancel(req.params.id, req.user.id);
+    res.json({ message: 'Reserva cancelada', booking });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const markSeen = async (req, res, next) => {
+  try {
+    await bookingsService.markSeenByClient(req.params.id, req.user.id);
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { create, getByUser, getById, accept, reject, complete, cancel, markSeen };
