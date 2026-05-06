@@ -119,7 +119,7 @@ const updateStatus = async (bookingId, userId, status) => {
   }
 
   const result = await db.query(
-    `UPDATE bookings SET status = $1, updated_at = NOW()
+    `UPDATE bookings SET status = $1, updated_at = NOW(), client_seen = false
      WHERE id = $2 AND professional_id = $3
      RETURNING *`,
     [status, bookingId, userId]
@@ -152,4 +152,12 @@ const cancel = async (bookingId, userId) => {
   return result.rows[0];
 };
 
-module.exports = { create, getByUser, getById, updateStatus, cancel };
+const markSeenByClient = async (bookingId, userId) => {
+  await db.query(
+    `UPDATE bookings SET client_seen = true
+     WHERE id = $1 AND client_id = $2`,
+    [bookingId, userId]
+  );
+};
+
+module.exports = { create, getByUser, getById, updateStatus, cancel, markSeenByClient };

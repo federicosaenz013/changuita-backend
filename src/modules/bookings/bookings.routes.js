@@ -10,5 +10,6 @@ router.put('/:id/accept',   authenticate, requireRole('professional'), controlle
 router.put('/:id/reject',   authenticate, requireRole('professional'), controller.reject);
 router.put('/:id/complete', authenticate, requireRole('professional'), controller.complete);
 router.put('/:id/cancel',   authenticate, controller.cancel);
+router.put('/:id/seen',     authenticate, controller.markSeen);
 
 module.exports = router;

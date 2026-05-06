@@ -63,4 +63,13 @@ const cancel = async (req, res, next) => {
   }
 };
 
-module.exports = { create, getByUser, getById, accept, reject, complete, cancel };
+const markSeen = async (req, res, next) => {
+  try {
+    await bookingsService.markSeenByClient(req.params.id, req.user.id);
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { create, getByUser, getById, accept, reject, complete, cancel, markSeen };
