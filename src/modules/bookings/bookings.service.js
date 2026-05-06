@@ -56,6 +56,7 @@ const getByUser = async (userId, role) => {
       b.location_text,
       b.notes,
       b.created_at,
+      b.client_seen,
       s.title AS service_title,
       s.price_type,
       u_client.name AS client_name,
