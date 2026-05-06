@@ -6,6 +6,10 @@ const create = async (req, res, next) => {
   try {
     const booking = await bookingsService.create(req.user.id, req.body);
     res.status(201).json({ message: 'Reserva creada correctamente', booking });
+    const tokenRes = await db.query('SELECT token FROM push_tokens WHERE user_id = $1 LIMIT 1', [booking.professional_id]);
+    if (tokenRes.rows.length > 0) {
+      await sendNotification(tokenRes.rows[0].token, '📩 Nueva reserva', 'Tenés una nueva solicitud de reserva', {});
+    }
   } catch (err) {
     next(err);
   }

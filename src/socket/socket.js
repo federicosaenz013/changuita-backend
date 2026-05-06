@@ -60,6 +60,21 @@ const initSocket = (server) => {
           created_at:  message.created_at,
         });
 
+        // Notificar al receptor si no está en la sala
+        const { sendNotification } = require('../modules/notifications/notifications.service');
+        const tokenRes = await db.query(
+          'SELECT token FROM push_tokens WHERE user_id = $1 LIMIT 1',
+          [receiverId]
+        );
+        if (tokenRes.rows.length > 0) {
+          await sendNotification(
+            tokenRes.rows[0].token,
+            '💬 Nuevo mensaje',
+            message.content.length > 50 ? message.content.substring(0, 50) + '...' : message.content,
+            {}
+          );
+        }
+
       } catch (err) {
         console.error('Error guardando mensaje:', err.message);
         socket.emit('error', { message: 'Error enviando mensaje' });
