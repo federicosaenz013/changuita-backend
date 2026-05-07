@@ -73,4 +73,24 @@ const getMyReviews = async (userId) => {
   return result.rows;
 };
 
-module.exports = { create, getByProfessional, getMyReviews };
+const getGiven = async (userId) => {
+  const result = await db.query(
+    `SELECT
+      r.id,
+      r.rating,
+      r.comment,
+      r.created_at,
+      u.name AS professional_name,
+      s.title AS service_title
+     FROM reviews r
+     JOIN users u ON r.professional_id = u.id
+     JOIN bookings b ON r.booking_id = b.id
+     JOIN services s ON b.service_id = s.id
+     WHERE r.client_id = $1
+     ORDER BY r.created_at DESC`,
+    [userId]
+  );
+  return result.rows;
+};
+
+module.exports = { create, getByProfessional, getMyReviews, getGiven };

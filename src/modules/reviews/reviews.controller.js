@@ -27,4 +27,13 @@ const getMyReviews = async (req, res, next) => {
   }
 };
 
-module.exports = { create, getByProfessional, getMyReviews };
+const getGiven = async (req, res, next) => {
+  try {
+    const reviews = await reviewsService.getGiven(req.user.id);
+    res.json({ reviews });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { create, getMyReviews, getByProfessional, getGiven };
