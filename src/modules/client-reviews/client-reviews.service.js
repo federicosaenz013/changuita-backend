@@ -15,4 +15,24 @@ const create = async (professionalId, bookingId, clientId, rating, comment) => {
   return result.rows[0];
 };
 
-module.exports = { create };
+const getByClient = async (clientId) => {
+  const result = await db.query(
+    `SELECT
+      cr.id,
+      cr.rating,
+      cr.comment,
+      cr.created_at,
+      u.name AS professional_name,
+      s.title AS service_title
+     FROM client_reviews cr
+     JOIN users u ON cr.professional_id = u.id
+     JOIN bookings b ON cr.booking_id = b.id
+     JOIN services s ON b.service_id = s.id
+     WHERE cr.client_id = $1
+     ORDER BY cr.created_at DESC`,
+    [clientId]
+  );
+  return result.rows;
+};
+
+module.exports = { create, getByClient };

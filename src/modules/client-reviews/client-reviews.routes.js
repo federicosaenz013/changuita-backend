@@ -4,5 +4,6 @@ const controller = require('./client-reviews.controller');
 const { authenticate, requireRole } = require('../../middleware/auth');
 
 router.post('/', authenticate, requireRole('professional'), controller.create);
+router.get('/my-reviews', authenticate, controller.getByClient);
 
 module.exports = router;

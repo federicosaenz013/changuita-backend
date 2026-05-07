@@ -10,4 +10,13 @@ const create = async (req, res, next) => {
   }
 };
 
-module.exports = { create };
+const getByClient = async (req, res, next) => {
+  try {
+    const reviews = await service.getByClient(req.user.id);
+    res.json({ reviews });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { create, getByClient };
