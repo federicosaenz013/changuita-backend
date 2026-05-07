@@ -111,7 +111,7 @@ const getById = async (bookingId, userId) => {
   return result.rows[0];
 };
 
-const updateStatus = async (bookingId, userId, status) => {
+const updateStatus = async (bookingId, userId, status, rejectionReason = null) => {
   const validStatuses = ['accepted', 'rejected', 'completed'];
   if (!validStatuses.includes(status)) {
     const error = new Error('Estado no válido');
@@ -120,10 +120,11 @@ const updateStatus = async (bookingId, userId, status) => {
   }
 
   const result = await db.query(
-    `UPDATE bookings SET status = $1, updated_at = NOW(), client_seen = false
+    `UPDATE bookings SET status = $1, updated_at = NOW(), client_seen = false,
+     rejection_reason = CASE WHEN $4::text IS NOT NULL THEN $4::text ELSE rejection_reason END
      WHERE id = $2 AND professional_id = $3
      RETURNING *`,
-    [status, bookingId, userId]
+    [status, bookingId, userId, rejectionReason]
   );
 
   if (result.rows.length === 0) {

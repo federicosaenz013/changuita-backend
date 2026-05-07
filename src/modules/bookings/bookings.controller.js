@@ -48,7 +48,7 @@ const accept = async (req, res, next) => {
 
 const reject = async (req, res, next) => {
   try {
-    const booking = await bookingsService.updateStatus(req.params.id, req.user.id, 'rejected');
+    const booking = await bookingsService.updateStatus(req.params.id, req.user.id, 'rejected', req.body.motivo || null);
     res.json({ message: 'Reserva rechazada', booking });
     const tokenRes = await db.query('SELECT token FROM push_tokens WHERE user_id = $1 LIMIT 1', [booking.client_id]);
     if (tokenRes.rows.length > 0) {
