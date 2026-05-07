@@ -1,9 +1,15 @@
 const bookingsService = require('./bookings.service');
+const { sendNotification } = require('../notifications/notifications.service');
+const db = require('../../config/database');
 
 const create = async (req, res, next) => {
   try {
     const booking = await bookingsService.create(req.user.id, req.body);
     res.status(201).json({ message: 'Reserva creada correctamente', booking });
+    const tokenRes = await db.query('SELECT token FROM push_tokens WHERE user_id = $1 LIMIT 1', [booking.professional_id]);
+    if (tokenRes.rows.length > 0) {
+      await sendNotification(tokenRes.rows[0].token, '📩 Nueva reserva', 'Tenés una nueva solicitud de reserva', {});
+    }
   } catch (err) {
     next(err);
   }
@@ -31,6 +37,10 @@ const accept = async (req, res, next) => {
   try {
     const booking = await bookingsService.updateStatus(req.params.id, req.user.id, 'accepted');
     res.json({ message: 'Reserva aceptada', booking });
+    const tokenRes = await db.query('SELECT token FROM push_tokens WHERE user_id = $1 LIMIT 1', [booking.client_id]);
+    if (tokenRes.rows.length > 0) {
+      await sendNotification(tokenRes.rows[0].token, '✅ Reserva aceptada', 'Tu reserva fue aceptada por el profesional', {});
+    }
   } catch (err) {
     next(err);
   }
@@ -40,6 +50,10 @@ const reject = async (req, res, next) => {
   try {
     const booking = await bookingsService.updateStatus(req.params.id, req.user.id, 'rejected');
     res.json({ message: 'Reserva rechazada', booking });
+    const tokenRes = await db.query('SELECT token FROM push_tokens WHERE user_id = $1 LIMIT 1', [booking.client_id]);
+    if (tokenRes.rows.length > 0) {
+      await sendNotification(tokenRes.rows[0].token, '❌ Reserva rechazada', 'Tu reserva fue rechazada por el profesional', {});
+    }
   } catch (err) {
     next(err);
   }
@@ -49,6 +63,10 @@ const complete = async (req, res, next) => {
   try {
     const booking = await bookingsService.updateStatus(req.params.id, req.user.id, 'completed');
     res.json({ message: 'Reserva completada', booking });
+    const tokenRes = await db.query('SELECT token FROM push_tokens WHERE user_id = $1 LIMIT 1', [booking.client_id]);
+    if (tokenRes.rows.length > 0) {
+      await sendNotification(tokenRes.rows[0].token, '🎉 Trabajo completado', 'El profesional marcó el trabajo como completado', {});
+    }
   } catch (err) {
     next(err);
   }
