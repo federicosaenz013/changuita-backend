@@ -56,7 +56,8 @@ const getById = async (id) => {
       pp.portfolio_images,
       pp.is_available,
       pp.verification_status,
-      COALESCE(pp.availability, pp.availability_schedule) AS availability
+      COALESCE(pp.availability, pp.availability_schedule) AS availability,
+      (SELECT COUNT(*) FROM bookings b WHERE b.professional_id = u.id AND b.status = 'completed')::int AS completed_jobs
     FROM professional_profiles pp
     JOIN users u ON pp.user_id = u.id
     WHERE u.id = $1 AND u.is_active = true`,
