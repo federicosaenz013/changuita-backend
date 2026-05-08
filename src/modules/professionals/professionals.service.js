@@ -14,7 +14,8 @@ const getAll = async ({ category, lat, lng, radius = 10 }) => {
       pp.rating,
       pp.reviews_count,
       pp.is_available,
-      pp.verification_status
+      pp.verification_status,
+      pp.coverage_radius
     FROM professional_profiles pp
     JOIN users u ON pp.user_id = u.id
     WHERE u.is_active = true AND pp.is_available = true
