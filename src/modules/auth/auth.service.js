@@ -1,6 +1,10 @@
 const bcrypt = require('bcryptjs');
 const jwt    = require('jsonwebtoken');
+const crypto = require('crypto');
 const db     = require('../../config/database');
+const { sendVerificationEmail } = require('../email/email.service');
+
+const EMAIL_VERIFICATION_ENABLED = false; // activar cuando el dominio esté verificado en Resend
 
 const generateTokens = (userId, role) => {
   const accessToken = jwt.sign(
@@ -32,14 +36,26 @@ const register = async ({ name, email, phone, password, role }) => {
 
   const password_hash = await bcrypt.hash(password, 12);
 
+  const verificationToken = crypto.randomBytes(32).toString('hex');
+  const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
   const result = await db.query(
-    `INSERT INTO users (name, email, phone, password_hash, role)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO users (name, email, phone, password_hash, role, email_verified, verification_token, verification_token_expires)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING id, name, email, role, created_at`,
-    [name, email, phone, password_hash, role || 'client']
+    [name, email, phone, password_hash, role || 'client',
+     !EMAIL_VERIFICATION_ENABLED, verificationToken, verificationExpires]
   );
 
   const user = result.rows[0];
+
+  if (EMAIL_VERIFICATION_ENABLED) {
+    try {
+      await sendVerificationEmail(email, name, verificationToken);
+    } catch (e) {
+      console.error('Error enviando email de verificación:', e.message);
+    }
+  }
 
   if (role === 'professional') {
     await db.query(
