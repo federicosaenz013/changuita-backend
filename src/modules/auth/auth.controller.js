@@ -1,4 +1,5 @@
 const authService = require('./auth.service');
+const db = require('../../config/database');
 
 const register = async (req, res, next) => {
   try {
@@ -56,4 +57,31 @@ const me = async (req, res) => {
   res.json({ user: req.user });
 };
 
-module.exports = { register, login, logout, me };
+const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.query;
+    if (!token) return res.status(400).send('Token inválido');
+
+    const result = await db.query(
+      `UPDATE users SET email_verified = true, verification_token = null, verification_token_expires = null
+       WHERE verification_token = $1 AND verification_token_expires > NOW()
+       RETURNING name, email`,
+      [token]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).send('Token inválido o expirado');
+    }
+
+    res.send(`
+      <html><body style="font-family: Arial; text-align: center; padding: 60px;">
+        <h2 style="color: #3898EC;">✅ ¡Email verificado!</h2>
+        <p>Tu cuenta de Changuita está activa. Ya podés iniciar sesión desde la app.</p>
+      </body></html>
+    `);
+  } catch (err) {
+    res.status(500).send('Error al verificar el email');
+  }
+};
+
+module.exports = { register, login, logout, me, verifyEmail };
