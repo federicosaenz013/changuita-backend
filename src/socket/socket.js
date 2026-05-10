@@ -1,6 +1,26 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 
+const sendPushNotification = async (expoPushToken, title, body) => {
+  try {
+    await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to:    expoPushToken,
+        title,
+        body,
+        sound: 'default',
+        data:  { type: 'new_message' },
+      }),
+    });
+  } catch (err) {
+    console.error('Error enviando push notification:', err.message);
+  }
+};
+
 const initSocket = (server) => {
   const io = new Server(server, {
     cors: {
@@ -9,14 +29,9 @@ const initSocket = (server) => {
     },
   });
 
-  // Middleware de autenticación para Socket.IO
   io.use((socket, next) => {
     const token = socket.handshake.auth.token;
-
-    if (!token) {
-      return next(new Error('Token no proporcionado'));
-    }
-
+    if (!token) return next(new Error('Token no proporcionado'));
     try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       socket.userId = decoded.userId;
@@ -29,29 +44,25 @@ const initSocket = (server) => {
   io.on('connection', (socket) => {
     console.log(`Usuario conectado: ${socket.userId}`);
 
-    // Unirse a una sala de booking
     socket.on('join_booking', (bookingId) => {
       socket.join(`booking_${bookingId}`);
-      console.log(`Usuario ${socket.userId} se unió a booking_${bookingId}`);
     });
 
-    // Enviar mensaje
     socket.on('send_message', async (data) => {
       const { bookingId, content, receiverId } = data;
-
       try {
         const db = require('../config/database');
 
+        // Guardar mensaje
         const result = await db.query(
           `INSERT INTO messages (booking_id, sender_id, receiver_id, content)
            VALUES ($1, $2, $3, $4)
            RETURNING *`,
           [bookingId, socket.userId, receiverId, content]
         );
-
         const message = result.rows[0];
 
-        // Enviar mensaje a todos en la sala
+        // Emitir a la sala
         io.to(`booking_${bookingId}`).emit('new_message', {
           id:          message.id,
           content:     message.content,
@@ -60,18 +71,23 @@ const initSocket = (server) => {
           created_at:  message.created_at,
         });
 
-        // Notificar al receptor si no está en la sala
-        const { sendNotification } = require('../modules/notifications/notifications.service');
-        const tokenRes = await db.query(
-          'SELECT token FROM push_tokens WHERE user_id = $1 LIMIT 1',
-          [receiverId]
-        );
-        if (tokenRes.rows.length > 0) {
-          await sendNotification(
-            tokenRes.rows[0].token,
-            '💬 Nuevo mensaje',
-            message.content.length > 50 ? message.content.substring(0, 50) + '...' : message.content,
-            {}
+        // Buscar nombre del remitente y token push del receptor
+        const [senderRes, tokenRes] = await Promise.all([
+          db.query('SELECT name FROM users WHERE id = $1', [socket.userId]),
+          db.query(
+            'SELECT token FROM push_tokens WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1',
+            [receiverId]
+          ),
+        ]);
+
+        const senderName  = senderRes.rows[0]?.name || 'Alguien';
+        const pushToken   = tokenRes.rows[0]?.token;
+
+        if (pushToken) {
+          await sendPushNotification(
+            pushToken,
+            `Nuevo mensaje de ${senderName}`,
+            content.length > 80 ? content.substring(0, 80) + '...' : content
           );
         }
 
@@ -81,13 +97,11 @@ const initSocket = (server) => {
       }
     });
 
-    // Marcar mensajes como leídos
     socket.on('mark_read', async (bookingId) => {
       try {
         const db = require('../config/database');
         await db.query(
-          `UPDATE messages SET is_read = true
-           WHERE booking_id = $1 AND receiver_id = $2`,
+          `UPDATE messages SET is_read = true WHERE booking_id = $1 AND receiver_id = $2`,
           [bookingId, socket.userId]
         );
       } catch (err) {
