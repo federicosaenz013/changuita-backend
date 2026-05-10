@@ -1,6 +1,6 @@
 const { MercadoPagoConfig, Preference } = require('mercadopago');
 
-const client = new MercadoPagoConfig({ accessToken: process.env.MP_ACCESS_TOKEN });
+const client = new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN });
 
 const createPreference = async (req, res) => {
   try {
@@ -16,7 +16,7 @@ const createPreference = async (req, res) => {
         notification_url: process.env.BACKEND_URL + '/api/payments/webhook',
       },
     });
-    res.json({ preference_id: result.id, init_point: result.init_point, sandbox_init_point: result.sandbox_init_point });
+    res.json({ preference_id: result.id, init_point: result.init_point, sandbox_init_point: result.sandbox_init_point, is_production: true });
   } catch (error) {
     console.error('Error creando preferencia MP:', error);
     res.status(500).json({ error: 'Error al crear preferencia de pago' });
