@@ -116,4 +116,49 @@ const logout = async (refreshToken) => {
   );
 };
 
-module.exports = { register, login, logout };
+const googleLogin = async ({ accessToken }) => {
+  // Verificar el token con Google y obtener datos del usuario
+  const googleRes = await fetch(
+    `https://www.googleapis.com/oauth2/v1/userinfo?access_token=${accessToken}`
+  );
+  const googleUser = await googleRes.json();
+
+  if (!googleUser.id || !googleUser.email) {
+    const error = new Error('Token de Google inválido');
+    error.status = 401;
+    throw error;
+  }
+
+  // Buscar si ya existe el usuario
+  let result = await db.query(
+    'SELECT id, name, email, role FROM users WHERE email = $1 AND is_active = true',
+    [googleUser.email]
+  );
+
+  let user;
+
+  if (result.rows.length > 0) {
+    user = result.rows[0];
+  } else {
+    // Crear usuario nuevo
+    const newUser = await db.query(
+      `INSERT INTO users (name, email, password_hash, role, email_verified)
+       VALUES ($1, $2, $3, 'client', true)
+       RETURNING id, name, email, role`,
+      [googleUser.name, googleUser.email, await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 12)]
+    );
+    user = newUser.rows[0];
+  }
+
+  const { accessToken: token, refreshToken } = generateTokens(user.id, user.role);
+
+  await db.query(
+    `INSERT INTO refresh_tokens (user_id, token, expires_at)
+     VALUES ($1, $2, NOW() + INTERVAL '30 days')`,
+    [user.id, refreshToken]
+  );
+
+  return { user, accessToken: token, refreshToken };
+};
+
+module.exports = { register, login, logout, googleLogin };
