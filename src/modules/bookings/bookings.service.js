@@ -14,6 +14,12 @@ const create = async (clientId, data) => {
     throw error;
   }
 
+  if (clientId === professional_id) {
+    const error = new Error('No podés reservarte a vos mismo');
+    error.status = 400;
+    throw error;
+  }
+
   const conflict = await db.query(
     `SELECT id FROM bookings
      WHERE professional_id = $1
@@ -42,8 +48,6 @@ const create = async (clientId, data) => {
 };
 
 const getByUser = async (userId, role) => {
-  const field = role === 'professional' ? 'professional_id' : 'client_id';
-
   const result = await db.query(
     `SELECT
       b.id,
@@ -64,6 +68,7 @@ const getByUser = async (userId, role) => {
       u_client.profile_photo AS client_photo,
       u_prof.name AS professional_name,
       u_prof.profile_photo AS professional_photo,
+      CASE WHEN b.client_id = $1 THEN 'client' ELSE 'professional' END AS my_role,
       COALESCE((
         SELECT COUNT(*)::int
         FROM messages m
@@ -75,7 +80,7 @@ const getByUser = async (userId, role) => {
     JOIN services s ON b.service_id = s.id
     JOIN users u_client ON b.client_id = u_client.id
     JOIN users u_prof ON b.professional_id = u_prof.id
-    WHERE b.${field} = $1
+    WHERE b.client_id = $1 OR b.professional_id = $1
     ORDER BY b.created_at DESC`,
     [userId]
   );
