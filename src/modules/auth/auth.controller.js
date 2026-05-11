@@ -84,4 +84,20 @@ const verifyEmail = async (req, res) => {
   }
 };
 
-module.exports = { register, login, logout, me, verifyEmail };
+const googleLogin = async (req, res, next) => {
+  try {
+    const { accessToken } = req.body;
+    if (!accessToken) return res.status(400).json({ error: 'Token de Google requerido' });
+    const result = await authService.googleLogin({ accessToken });
+    res.json({
+      message:      'Login con Google exitoso',
+      user:         result.user,
+      accessToken:  result.accessToken,
+      refreshToken: result.refreshToken,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { register, login, logout, me, verifyEmail, googleLogin };
