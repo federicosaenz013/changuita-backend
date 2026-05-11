@@ -16,7 +16,9 @@ server.listen(PORT, async () => {
   try {
     const db = require('./src/config/database');
     await db.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50)`);
-    console.log('✅ Migración payment_method OK');
+    await db.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS client_amount_confirmed BOOLEAN DEFAULT false`);
+    await db.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS client_amount NUMERIC`);
+    console.log('✅ Migraciones OK');
   } catch (e) {
     console.log('Migración payment_method:', e.message);
   }

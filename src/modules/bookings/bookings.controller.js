@@ -97,4 +97,15 @@ const markSeen = async (req, res, next) => {
   }
 };
 
-module.exports = { create, getByUser, getById, accept, reject, complete, cancel, markSeen };
+const confirmAmount = async (req, res, next) => {
+  try {
+    const { monto_cliente } = req.body;
+    await db.query(
+      `UPDATE bookings SET client_amount_confirmed = true, client_amount = $1 WHERE id = $2 AND client_id = $3`,
+      [monto_cliente || null, req.params.id, req.user.id]
+    );
+    res.json({ ok: true });
+  } catch (err) { next(err); }
+};
+
+module.exports = { create, getByUser, getById, accept, reject, complete, cancel, markSeen, confirmAmount };
