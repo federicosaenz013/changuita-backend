@@ -61,11 +61,18 @@ const reject = async (req, res, next) => {
 
 const complete = async (req, res, next) => {
   try {
+    const { monto_final, metodo_pago } = req.body;
     const booking = await bookingsService.updateStatus(req.params.id, req.user.id, 'completed');
-    res.json({ message: 'Reserva completada', booking });
+    if (monto_final) {
+      await db.query(
+        'UPDATE bookings SET total_amount = $1, payment_method = $2 WHERE id = $3',
+        [monto_final, metodo_pago || 'efectivo', req.params.id]
+      );
+    }
+    res.json({ message: 'Trabajo completado', booking });
     const tokenRes = await db.query('SELECT token FROM push_tokens WHERE user_id = $1 LIMIT 1', [booking.client_id]);
     if (tokenRes.rows.length > 0) {
-      await sendNotification(tokenRes.rows[0].token, '🎉 Trabajo completado', 'El profesional marcó el trabajo como completado', {});
+      await sendNotification(tokenRes.rows[0].token, '🎉 Trabajo completado', `El profesional completó el trabajo. Podés dejar tu reseña.`, {});
     }
   } catch (err) {
     next(err);
