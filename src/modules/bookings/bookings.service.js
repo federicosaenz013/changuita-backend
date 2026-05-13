@@ -69,6 +69,7 @@ const getByUser = async (userId, role) => {
       u_prof.name AS professional_name,
       u_prof.profile_photo AS professional_photo,
       CASE WHEN b.client_id = $1 THEN 'client' ELSE 'professional' END AS my_role,
+      EXISTS (SELECT 1 FROM reviews r WHERE r.booking_id = b.id) AS has_review,
       COALESCE((
         SELECT COUNT(*)::int
         FROM messages m
