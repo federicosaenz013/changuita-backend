@@ -35,7 +35,7 @@ const getAll = async ({ category, lat, lng, radius = 10 }) => {
     )`;
   }
 
-  query += ` ORDER BY pp.rating DESC NULLS LAST`;
+  query += ` ORDER BY pp.rating DESC`;
 
   const result = await db.query(query, params);
   return result.rows;
