@@ -15,7 +15,8 @@ const getAll = async ({ category, lat, lng, radius = 10 }) => {
       pp.reviews_count,
       pp.is_available,
       pp.verification_status,
-      pp.coverage_radius
+      pp.coverage_radius,
+      (SELECT COUNT(*) FROM bookings b WHERE b.professional_id = u.id AND b.status = 'completed')::int AS completed_jobs
     FROM professional_profiles pp
     JOIN users u ON pp.user_id = u.id
     WHERE u.is_active = true AND pp.is_available = true
@@ -34,7 +35,7 @@ const getAll = async ({ category, lat, lng, radius = 10 }) => {
     )`;
   }
 
-  query += ` ORDER BY pp.rating DESC`;
+  query += ` ORDER BY pp.rating DESC NULLS LAST`;
 
   const result = await db.query(query, params);
   return result.rows;
