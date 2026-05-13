@@ -100,4 +100,65 @@ const googleLogin = async (req, res, next) => {
   }
 };
 
-module.exports = { register, login, logout, me, verifyEmail, googleLogin };
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email requerido' });
+    await authService.forgotPassword(email);
+    res.json({ ok: true, message: 'Email enviado si la cuenta existe' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const resetPasswordForm = async (req, res) => {
+  const { token } = req.query;
+  if (!token) return res.status(400).send('Token inválido');
+  res.send(`
+    <html>
+    <body style="font-family: Arial; max-width: 400px; margin: 60px auto; padding: 20px;">
+      <h2 style="color: #3898EC;">Nueva contraseña</h2>
+      <form method="POST" action="/api/auth/reset-password">
+        <input type="hidden" name="token" value="${token}" />
+        <input type="password" name="password" placeholder="Nueva contraseña" required
+          style="width:100%; padding:12px; border-radius:8px; border:1px solid #ddd; margin-bottom:12px; font-size:15px;" />
+        <input type="password" name="confirm" placeholder="Repetí la contraseña" required
+          style="width:100%; padding:12px; border-radius:8px; border:1px solid #ddd; margin-bottom:16px; font-size:15px;" />
+        <button type="submit"
+          style="background:#FF6B35; color:white; padding:14px 24px; border:none; border-radius:8px; font-size:15px; font-weight:bold; width:100%; cursor:pointer;">
+          Cambiar contraseña
+        </button>
+      </form>
+    </body>
+    </html>
+  `);
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { token, password, confirm } = req.body;
+    if (!token || !password) return res.status(400).send('Datos inválidos');
+    if (password !== confirm) return res.send(`
+      <html><body style="font-family:Arial;text-align:center;padding:60px;">
+        <h2 style="color:#C62828;">Las contraseñas no coinciden</h2>
+        <a href="javascript:history.back()">Volver</a>
+      </body></html>
+    `);
+    await authService.resetPassword(token, password);
+    res.send(`
+      <html><body style="font-family:Arial;text-align:center;padding:60px;">
+        <h2 style="color:#22c55e;">✅ ¡Contraseña actualizada!</h2>
+        <p>Ya podés iniciar sesión desde la app con tu nueva contraseña.</p>
+      </body></html>
+    `);
+  } catch (err) {
+    res.status(400).send(`
+      <html><body style="font-family:Arial;text-align:center;padding:60px;">
+        <h2 style="color:#C62828;">Error</h2>
+        <p>${err.message}</p>
+      </body></html>
+    `);
+  }
+};
+
+module.exports = { register, login, logout, me, verifyEmail, googleLogin, forgotPassword, resetPasswordForm, resetPassword };

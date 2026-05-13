@@ -161,4 +161,41 @@ const googleLogin = async ({ accessToken }) => {
   return { user, accessToken: token, refreshToken };
 };
 
-module.exports = { register, login, logout, googleLogin };
+const forgotPassword = async (email) => {
+  const result = await db.query(
+    'SELECT id, name FROM users WHERE email = $1 AND is_active = true',
+    [email]
+  );
+  if (result.rows.length === 0) return; // No revelar si existe o no
+
+  const user = result.rows[0];
+  const token = crypto.randomBytes(32).toString('hex');
+  const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+  await db.query(
+    `UPDATE users SET verification_token = $1, verification_token_expires = $2 WHERE id = $3`,
+    [token, expires, user.id]
+  );
+
+  const { sendVerificationEmail } = require('../email/email.service');
+  await sendVerificationEmail(email, user.name, token, 'reset');
+};
+
+const resetPassword = async (token, newPassword) => {
+  const result = await db.query(
+    `SELECT id FROM users WHERE verification_token = $1 AND verification_token_expires > NOW()`,
+    [token]
+  );
+  if (result.rows.length === 0) {
+    const error = new Error('Token inválido o expirado');
+    error.status = 400;
+    throw error;
+  }
+  const password_hash = await bcrypt.hash(newPassword, 12);
+  await db.query(
+    `UPDATE users SET password_hash = $1, verification_token = null, verification_token_expires = null WHERE id = $2`,
+    [password_hash, result.rows[0].id]
+  );
+};
+
+module.exports = { register, login, logout, googleLogin, forgotPassword, resetPassword };
