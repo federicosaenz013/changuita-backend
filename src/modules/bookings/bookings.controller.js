@@ -83,6 +83,9 @@ const cancel = async (req, res, next) => {
   try {
     const booking = await bookingsService.cancel(req.params.id, req.user.id);
     res.json({ message: 'Reserva cancelada', booking });
+    // Verificar sanciones automáticas al profesional
+    const { checkAndApplySanctions } = require('../sanctions/sanctions.service');
+    await checkAndApplySanctions(booking.professional_id);
   } catch (err) {
     next(err);
   }
