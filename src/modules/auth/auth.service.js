@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const db     = require('../../config/database');
 const { sendVerificationEmail } = require('../email/email.service');
 
-const EMAIL_VERIFICATION_ENABLED = true; // activar cuando el dominio esté verificado en Resend
+const EMAIL_VERIFICATION_ENABLED = false; // activar cuando el dominio esté verificado en Resend
 
 const generateTokens = (userId, role) => {
   const accessToken = jwt.sign(
@@ -62,6 +62,12 @@ const register = async ({ name, email, phone, password, role }) => {
       'INSERT INTO professional_profiles (user_id) VALUES ($1)',
       [user.id]
     );
+    try {
+      const { assignTrial } = require('../subscriptions/subscriptions.service');
+      await assignTrial(user.id);
+    } catch (e) {
+      console.log('Error asignando trial:', e.message);
+    }
   }
 
   const { accessToken, refreshToken } = generateTokens(user.id, user.role);
