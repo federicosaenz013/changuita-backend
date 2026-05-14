@@ -34,6 +34,7 @@ app.use('/api/notifications', require('./modules/notifications/notifications.rou
 app.use('/api/ai',            require('./modules/ai/ai.routes'));
 app.use('/api/client-reviews', require('./modules/client-reviews/client-reviews.routes'));
 app.use('/api/sanctions',      require('./modules/sanctions/sanctions.routes'));
+app.use('/api/subscriptions',  require('./modules/subscriptions/subscriptions.routes'));
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
