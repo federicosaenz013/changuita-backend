@@ -53,8 +53,21 @@ const logout = async (req, res, next) => {
   }
 };
 
-const me = async (req, res) => {
-  res.json({ user: req.user });
+const me = async (req, res, next) => {
+  try {
+    const db = require('../../config/database');
+    const result = await db.query(
+      `SELECT u.id, u.name, u.email, u.role, u.profile_photo,
+        pp.description, pp.location_text, pp.dni_photo, pp.verification_status,
+        pp.latitude, pp.longitude, pp.hourly_rate, pp.availability, pp.plan
+       FROM users u
+       LEFT JOIN professional_profiles pp ON pp.user_id = u.id
+       WHERE u.id = $1`,
+      [req.user.id]
+    );
+    const user = result.rows[0];
+    res.json({ user, professional_profile: user });
+  } catch (err) { next(err); }
 };
 
 const verifyEmail = async (req, res) => {
