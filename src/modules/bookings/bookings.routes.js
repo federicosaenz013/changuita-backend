@@ -1,13 +1,16 @@
 const express    = require('express');
 const router     = express.Router();
-const controller = require('./subscriptions.controller');
+const controller = require('./bookings.controller');
 const { authenticate, requireRole } = require('../../middleware/auth');
 
-router.get('/planes',     controller.getPlanes);
-router.get('/my',         authenticate, requireRole('professional'), controller.getMyPlan);
-router.post('/subscribe', authenticate, requireRole('professional'), controller.subscribeToPlan);
-router.get('/mp-success', controller.mpSuccess);
-router.get('/mp-failure', controller.mpFailure);
-router.get('/mp-pending',  controller.mpPending);
+router.post('/',                  authenticate, controller.create);
+router.get('/',                   authenticate, controller.getByUser);
+router.get('/:id',                authenticate, controller.getById);
+router.put('/:id/accept',         authenticate, requireRole('professional'), controller.accept);
+router.put('/:id/reject',         authenticate, requireRole('professional'), controller.reject);
+router.put('/:id/complete',       authenticate, requireRole('professional'), controller.complete);
+router.put('/:id/cancel',         authenticate, controller.cancel);
+router.put('/:id/seen',           authenticate, controller.markSeen);
+router.put('/:id/confirm-amount', authenticate, controller.confirmAmount);
 
 module.exports = router;
