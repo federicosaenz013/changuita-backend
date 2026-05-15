@@ -54,8 +54,9 @@ server.listen(PORT, async () => {
     // Plan en professional_profiles
     await db.query(`ALTER TABLE professional_profiles ADD COLUMN IF NOT EXISTS plan VARCHAR(20) DEFAULT 'free'`);
     await db.query(`ALTER TABLE professional_profiles ADD COLUMN IF NOT EXISTS sanctioned BOOLEAN DEFAULT false`);
-    await db.query(`ALTER TABLE professional_profiles ADD COLUMN IF NOT EXISTS sanction_expires_at TIMESTAMP`);
-
+await db.query(`ALTER TABLE professional_profiles ADD COLUMN IF NOT EXISTS sanction_expires_at TIMESTAMP`);
+    await db.query(`ALTER TABLE professional_profiles ADD COLUMN IF NOT EXISTS dni_photo VARCHAR(500)`);
+    
     console.log('✅ Migraciones OK');
   } catch (e) {
     console.log('Migración payment_method:', e.message);

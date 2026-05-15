@@ -7,6 +7,8 @@ router.get('/test', (req, res) => {
   res.json({ message: 'users module funcionando' });
 });
 
-router.put('/profile', authenticate, controller.updateProfile);
+router.put('/profile',      authenticate, controller.updateProfile);
+router.post('/upload-photo', authenticate, controller.uploadPhoto);
+router.post('/upload-dni',   authenticate, controller.uploadDni);
 
 module.exports = router;
