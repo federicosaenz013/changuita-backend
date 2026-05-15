@@ -35,6 +35,30 @@ const create = async (clientId, data) => {
     throw error;
   }
 
+  // Verificar límite de reservas para plan Free
+  const planRes = await db.query(
+    `SELECT pp.plan FROM professional_profiles pp WHERE pp.user_id = $1`,
+    [professional_id]
+  );
+  const plan = planRes.rows[0]?.plan || 'free';
+  if (plan === 'free') {
+    const inicioMes = new Date();
+    inicioMes.setDate(1);
+    inicioMes.setHours(0, 0, 0, 0);
+    const reservasMes = await db.query(
+      `SELECT COUNT(*) FROM bookings 
+       WHERE professional_id = $1 
+         AND created_at >= $2
+         AND status NOT IN ('cancelled', 'rejected')`,
+      [professional_id, inicioMes]
+    );
+    if (parseInt(reservasMes.rows[0].count) >= 5) {
+      const error = new Error('Este profesional alcanzó el límite de reservas del mes');
+      error.status = 429;
+      throw error;
+    }
+  }
+
   const total_amount = serviceResult.rows[0].price;
 
   const result = await db.query(
