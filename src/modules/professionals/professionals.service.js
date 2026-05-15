@@ -16,6 +16,7 @@ const getAll = async ({ category, lat, lng, radius = 10 }) => {
       pp.is_available,
       pp.verification_status,
       pp.coverage_radius,
+      u.profile_photo,
       (SELECT COUNT(*) FROM bookings b WHERE b.professional_id = u.id AND b.status = 'completed')::int AS completed_jobs
     FROM professional_profiles pp
     JOIN users u ON pp.user_id = u.id
