@@ -40,7 +40,6 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Panel admin
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changuita2024admin';
 
 app.get('/admin', (req, res) => {
@@ -110,8 +109,6 @@ app.get('/admin/dashboard', async (req, res) => {
           <a href="/admin" style="color:rgba(255,255,255,0.8);text-decoration:none;font-size:13px;">Cerrar sesión</a>
         </div>
         <div style="padding:32px;max-width:1100px;margin:0 auto;">
-          
-          <!-- Métricas -->
           <div style="display:flex;gap:16px;margin-bottom:32px;">
             <div style="background:white;border-radius:12px;padding:20px;flex:1;border:1px solid #e2e8f0;">
               <div style="font-size:32px;font-weight:700;color:#3898EC;">${users.rows[0].count}</div>
@@ -130,8 +127,6 @@ app.get('/admin/dashboard', async (req, res) => {
               <div style="color:#64748b;font-size:14px;">Sanciones activas</div>
             </div>
           </div>
-
-          <!-- DNIs -->
           <div style="background:white;border-radius:12px;padding:24px;margin-bottom:24px;border:1px solid #e2e8f0;">
             <h2 style="margin:0 0 16px;font-size:18px;color:#1e293b;">📋 Verificación de DNIs</h2>
             <table style="width:100%;border-collapse:collapse;">
@@ -147,8 +142,6 @@ app.get('/admin/dashboard', async (req, res) => {
               <tbody>${dniRows || '<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No hay DNIs para verificar</td></tr>'}</tbody>
             </table>
           </div>
-
-          <!-- Sanciones -->
           <div style="background:white;border-radius:12px;padding:24px;border:1px solid #e2e8f0;">
             <h2 style="margin:0 0 16px;font-size:18px;color:#1e293b;">⚠️ Sanciones activas</h2>
             <table style="width:100%;border-collapse:collapse;">
@@ -163,7 +156,6 @@ app.get('/admin/dashboard', async (req, res) => {
               <tbody>${sanctionRows || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No hay sanciones activas</td></tr>'}</tbody>
             </table>
           </div>
-
         </div>
       </body>
       </html>
@@ -178,10 +170,7 @@ app.get('/admin/verify', async (req, res) => {
   if (password !== ADMIN_PASSWORD) return res.redirect('/admin');
   const db = require('./config/database');
   try {
-    await db.query(
-      `UPDATE professional_profiles SET verification_status = $1 WHERE user_id = $2`,
-      [action, id]
-    );
+    await db.query(`UPDATE professional_profiles SET verification_status = $1 WHERE user_id = $2`, [action, id]);
     if (action === 'rejected') {
       await db.query(`UPDATE users SET is_active = false WHERE id = $1`, [id]);
       const userRes = await db.query(`SELECT name, email FROM users WHERE id = $1`, [id]);
@@ -232,6 +221,8 @@ app.get('/setup/get-push-token', async (req, res) => {
   const result = await db.query('SELECT token FROM push_tokens WHERE user_id = $1', [user_id]);
   res.json({ token: result.rows[0]?.token });
 });
+
+app.get('/setup/fix-ratings', async (req, res) => {
   const db = require('./config/database');
   try {
     await db.query(`

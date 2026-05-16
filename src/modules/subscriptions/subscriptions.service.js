@@ -2,9 +2,9 @@ const db = require('../../config/database');
 
 const PLANES = {
   free:   { nombre: 'Free',    precio_mensual: 0,  precio_anual: 0,     max_servicios: 1,    destacado_mapa: false, badge: false, orden: 4 },
-  basico: { nombre: 'Básico',  precio_mensual: 2,  precio_anual: 19.20, max_servicios: 3,    destacado_mapa: false, badge: false, orden: 3 },
-  medio:  { nombre: 'Medio',   precio_mensual: 3,  precio_anual: 28.80, max_servicios: 6,    destacado_mapa: true,  badge: false, orden: 2 },
-  full:   { nombre: 'Full',    precio_mensual: 5,  precio_anual: 48,    max_servicios: null, destacado_mapa: true,  badge: true,  orden: 1 },
+  basico: { nombre: 'Básico',  precio_mensual: 3000,  precio_anual: 28800, max_servicios: 3,    destacado_mapa: false, badge: false, orden: 3 },
+  medio:  { nombre: 'Medio',   precio_mensual: 5000,  precio_anual: 48000, max_servicios: 6,    destacado_mapa: true,  badge: false, orden: 2 },
+  full:   { nombre: 'Full',    precio_mensual: 7000,  precio_anual: 67200, max_servicios: null, destacado_mapa: true,  badge: true,  orden: 1 },
 };
 
 const PRIMEROS_200_DIAS = 90;
