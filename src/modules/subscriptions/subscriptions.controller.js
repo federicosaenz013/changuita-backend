@@ -57,7 +57,14 @@ const mpSuccess = async (req, res, next) => {
       <html><body style="font-family:Arial;text-align:center;padding:60px;">
         <h2 style="color:#22c55e;">✅ ¡Suscripción activada!</h2>
         <p>Tu plan ${plan} fue activado correctamente.</p>
-        <script>setTimeout(() => { window.location.href = 'changuita://suscripcion'; }, 2000);</script>
+        <script>
+          setTimeout(() => {
+            window.location.href = 'changuita://suscripcion';
+            setTimeout(() => {
+              window.location.href = 'intent://suscripcion#Intent;scheme=changuita;package=com.changuita.app;end';
+            }, 500);
+          }, 2000);
+        </script>
       </body></html>
     `);
   } catch (err) { next(err); }
