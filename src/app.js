@@ -184,7 +184,16 @@ app.get('/admin/verify', async (req, res) => {
     );
     if (action === 'rejected') {
       await db.query(`UPDATE users SET is_active = false WHERE id = $1`, [id]);
-      // Acá después agregamos el mail de rechazo
+      const userRes = await db.query(`SELECT name, email FROM users WHERE id = $1`, [id]);
+      if (userRes.rows.length > 0) {
+        const { sendVerificationEmail } = require('./modules/email/email.service');
+        const { name, email } = userRes.rows[0];
+        try {
+          await sendVerificationEmail(email, name, null, 'rejected');
+        } catch (e) {
+          console.log('Error enviando mail de rechazo:', e.message);
+        }
+      }
     }
     res.redirect(`/admin/dashboard?password=${ADMIN_PASSWORD}`);
   } catch (err) {

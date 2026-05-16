@@ -26,6 +26,21 @@ const sendVerificationEmail = async (email, name, token, type = 'verify') => {
         </div>
       `,
     });
+  } else if (type === 'rejected') {
+    await resend.emails.send({
+      from: FROM,
+      to: email,
+      subject: '❌ Tu cuenta de Changuita fue suspendida',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
+          <h2 style="color: #C62828;">Cuenta suspendida</h2>
+          <p>Hola ${name}, lamentablemente tu cuenta fue suspendida porque el DNI enviado no pudo ser verificado.</p>
+          <p>Si creés que esto es un error, contactanos respondiendo este email.</p>
+          <p style="color: #999; font-size: 12px;">El equipo de Changuita</p>
+        </div>
+      `,
+    });
+    return;
   } else {
     const verificationUrl = `https://changuita-backend-1.onrender.com/api/auth/verify-email?token=${token}`;
     await resend.emails.send({
