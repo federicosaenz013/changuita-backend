@@ -226,7 +226,12 @@ app.get('/setup/migrate', async (req, res) => {
   }
 });
 
-app.get('/setup/fix-ratings', async (req, res) => {
+app.get('/setup/get-push-token', async (req, res) => {
+  const db = require('./config/database');
+  const { user_id } = req.query;
+  const result = await db.query('SELECT token FROM push_tokens WHERE user_id = $1', [user_id]);
+  res.json({ token: result.rows[0]?.token });
+});
   const db = require('./config/database');
   try {
     await db.query(`
