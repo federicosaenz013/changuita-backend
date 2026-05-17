@@ -34,7 +34,7 @@ const subscribeToPlan = async (req, res, next) => {
           title: `Changuita Plan ${info.nombre} - ${periodo}`,
           quantity: 1,
           unit_price: precio,
-          currency_id: 'USD',
+          currency_id: 'ARS',
         }],
         back_urls: {
           success: `https://changuita-backend-1.onrender.com/api/subscriptions/mp-success?plan=${plan}&periodo=${periodo}&user=${req.user.id}`,
