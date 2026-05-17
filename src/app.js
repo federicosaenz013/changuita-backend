@@ -63,12 +63,21 @@ app.get('/admin/dashboard', async (req, res) => {
   if (password !== ADMIN_PASSWORD) return res.redirect('/admin');
   const db = require('./config/database');
   try {
-    const [users, bookings, pendingDni, sanctions] = await Promise.all([
+    const [users, bookings, pendingDni, sanctions, professionals, ingresos] = await Promise.all([
       db.query(`SELECT COUNT(*) FROM users`),
       db.query(`SELECT COUNT(*) FROM bookings`),
       db.query(`SELECT u.id, u.name, u.email, pp.dni_photo, pp.verification_status FROM professional_profiles pp JOIN users u ON pp.user_id = u.id WHERE pp.dni_photo IS NOT NULL ORDER BY pp.verification_status`),
       db.query(`SELECT s.*, u.name FROM sanctions s JOIN users u ON s.professional_id = u.id WHERE s.status = 'active'`),
+      db.query(`SELECT u.name, u.email, pp.plan, pp.verification_status, pp.sanctioned, (SELECT COUNT(*) FROM bookings b WHERE b.professional_id = u.id AND b.status = 'completed') as trabajos FROM users u JOIN professional_profiles pp ON pp.user_id = u.id WHERE u.role = 'professional' ORDER BY CASE pp.plan WHEN 'full' THEN 1 WHEN 'medio' THEN 2 WHEN 'basico' THEN 3 ELSE 4 END`),
+      db.query(`SELECT plan, COUNT(*) as cantidad FROM professional_profiles WHERE plan != 'free' GROUP BY plan`),
     ]);
+
+    // Calcular ingresos estimados
+    const precios = { basico: 3000, medio: 5000, full: 7000 };
+    let ingresoMensual = 0;
+    ingresos.rows.forEach(r => {
+      ingresoMensual += (precios[r.plan] || 0) * parseInt(r.cantidad);
+    });
 
     const dniRows = pendingDni.rows.map(p => `
       <tr>
@@ -78,9 +87,7 @@ app.get('/admin/dashboard', async (req, res) => {
           <a href="${p.dni_photo}" target="_blank"><img src="${p.dni_photo}" style="width:80px;height:60px;object-fit:cover;border-radius:6px;" /></a>
         </td>
         <td style="padding:10px;border-bottom:1px solid #eee;">
-          <span style="background:${p.verification_status === 'verified' ? '#dcfce7' : p.verification_status === 'rejected' ? '#fee2e2' : '#fef3c7'};padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;">
-            ${p.verification_status}
-          </span>
+          <span style="background:${p.verification_status === 'verified' ? '#dcfce7' : p.verification_status === 'rejected' ? '#fee2e2' : '#fef3c7'};padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;">${p.verification_status}</span>
         </td>
         <td style="padding:10px;border-bottom:1px solid #eee;">
           <a href="/admin/verify?id=${p.id}&action=verified&password=${ADMIN_PASSWORD}" style="background:#22c55e;color:white;padding:6px 12px;border-radius:6px;text-decoration:none;margin-right:6px;font-size:13px;">Aprobar</a>
@@ -100,6 +107,20 @@ app.get('/admin/dashboard', async (req, res) => {
       </tr>
     `).join('');
 
+    const profRows = professionals.rows.map(p => `
+      <tr>
+        <td style="padding:10px;border-bottom:1px solid #eee;">${p.name}</td>
+        <td style="padding:10px;border-bottom:1px solid #eee;font-size:12px;color:#64748b;">${p.email}</td>
+        <td style="padding:10px;border-bottom:1px solid #eee;">
+          <span style="background:${p.plan === 'full' ? '#fef3c7' : p.plan === 'medio' ? '#e9d5ff' : p.plan === 'basico' ? '#dbeafe' : '#f1f5f9'};padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;text-transform:capitalize;">${p.plan}</span>
+        </td>
+        <td style="padding:10px;border-bottom:1px solid #eee;text-align:center;">${p.trabajos}</td>
+        <td style="padding:10px;border-bottom:1px solid #eee;">
+          ${p.sanctioned ? '<span style="color:#ef4444;font-weight:600;font-size:12px;">⚠️ Sancionado</span>' : '<span style="color:#22c55e;font-size:12px;">✓ Activo</span>'}
+        </td>
+      </tr>
+    `).join('');
+
     res.send(`
       <html>
       <head><title>Admin Changuita</title></head>
@@ -108,25 +129,46 @@ app.get('/admin/dashboard', async (req, res) => {
           <h1 style="margin:0;font-size:22px;">🔧 Panel Admin Changuita</h1>
           <a href="/admin" style="color:rgba(255,255,255,0.8);text-decoration:none;font-size:13px;">Cerrar sesión</a>
         </div>
-        <div style="padding:32px;max-width:1100px;margin:0 auto;">
-          <div style="display:flex;gap:16px;margin-bottom:32px;">
-            <div style="background:white;border-radius:12px;padding:20px;flex:1;border:1px solid #e2e8f0;">
+        <div style="padding:32px;max-width:1200px;margin:0 auto;">
+          <div style="display:flex;gap:16px;margin-bottom:32px;flex-wrap:wrap;">
+            <div style="background:white;border-radius:12px;padding:20px;flex:1;min-width:180px;border:1px solid #e2e8f0;">
               <div style="font-size:32px;font-weight:700;color:#3898EC;">${users.rows[0].count}</div>
               <div style="color:#64748b;font-size:14px;">Usuarios totales</div>
             </div>
-            <div style="background:white;border-radius:12px;padding:20px;flex:1;border:1px solid #e2e8f0;">
+            <div style="background:white;border-radius:12px;padding:20px;flex:1;min-width:180px;border:1px solid #e2e8f0;">
               <div style="font-size:32px;font-weight:700;color:#22c55e;">${bookings.rows[0].count}</div>
               <div style="color:#64748b;font-size:14px;">Reservas totales</div>
             </div>
-            <div style="background:white;border-radius:12px;padding:20px;flex:1;border:1px solid #e2e8f0;">
+            <div style="background:white;border-radius:12px;padding:20px;flex:1;min-width:180px;border:1px solid #e2e8f0;">
               <div style="font-size:32px;font-weight:700;color:#f59e0b;">${pendingDni.rows.filter(p => p.verification_status === 'pending').length}</div>
               <div style="color:#64748b;font-size:14px;">DNIs pendientes</div>
             </div>
-            <div style="background:white;border-radius:12px;padding:20px;flex:1;border:1px solid #e2e8f0;">
+            <div style="background:white;border-radius:12px;padding:20px;flex:1;min-width:180px;border:1px solid #e2e8f0;">
               <div style="font-size:32px;font-weight:700;color:#ef4444;">${sanctions.rows.length}</div>
               <div style="color:#64748b;font-size:14px;">Sanciones activas</div>
             </div>
+            <div style="background:linear-gradient(135deg,#22c55e,#16a34a);border-radius:12px;padding:20px;flex:1;min-width:180px;color:white;">
+              <div style="font-size:32px;font-weight:700;">$${ingresoMensual.toLocaleString('es-AR')}</div>
+              <div style="font-size:14px;opacity:0.9;">Ingresos mensuales estimados (ARS)</div>
+            </div>
           </div>
+
+          <div style="background:white;border-radius:12px;padding:24px;margin-bottom:24px;border:1px solid #e2e8f0;">
+            <h2 style="margin:0 0 16px;font-size:18px;color:#1e293b;">👷 Profesionales (${professionals.rows.length})</h2>
+            <table style="width:100%;border-collapse:collapse;">
+              <thead>
+                <tr style="background:#f8fafc;">
+                  <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Nombre</th>
+                  <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Email</th>
+                  <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Plan</th>
+                  <th style="padding:10px;text-align:center;font-size:13px;color:#64748b;">Trabajos</th>
+                  <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Estado</th>
+                </tr>
+              </thead>
+              <tbody>${profRows || '<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No hay profesionales</td></tr>'}</tbody>
+            </table>
+          </div>
+
           <div style="background:white;border-radius:12px;padding:24px;margin-bottom:24px;border:1px solid #e2e8f0;">
             <h2 style="margin:0 0 16px;font-size:18px;color:#1e293b;">📋 Verificación de DNIs</h2>
             <table style="width:100%;border-collapse:collapse;">
@@ -142,6 +184,7 @@ app.get('/admin/dashboard', async (req, res) => {
               <tbody>${dniRows || '<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No hay DNIs para verificar</td></tr>'}</tbody>
             </table>
           </div>
+
           <div style="background:white;border-radius:12px;padding:24px;border:1px solid #e2e8f0;">
             <h2 style="margin:0 0 16px;font-size:18px;color:#1e293b;">⚠️ Sanciones activas</h2>
             <table style="width:100%;border-collapse:collapse;">

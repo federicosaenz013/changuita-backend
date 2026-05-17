@@ -79,5 +79,39 @@ const sendWelcomeEmail = async (email, name) => {
     `,
   });
 };
-
+const sendWelcomeEmail = async (email, name, role) => {
+  const esProfesional = role === 'professional';
+  await resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: `¡Bienvenido a Changuita${esProfesional ? ', '+name+'!' : '!'}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #3898EC;">¡Hola ${name}! 👋</h2>
+        <p>Gracias por sumarte a <strong>Changuita</strong>, la app que conecta clientes con profesionales en todo Argentina.</p>
+        ${esProfesional ? `
+          <p>Como profesional, ahora podés:</p>
+          <ul style="line-height:1.8;">
+            <li>Publicar tus servicios</li>
+            <li>Recibir reservas de clientes cercanos</li>
+            <li>Crecer tu cartera con cada reseña positiva</li>
+          </ul>
+          <p style="background:#eff6ff;padding:14px;border-radius:8px;color:#1e40af;">
+            🎁 <strong>Recordá:</strong> tenés 30 días gratis de prueba para empezar.
+          </p>
+          <p>Completá tu perfil con tu foto, DNI y zona de trabajo para empezar a recibir clientes.</p>
+        ` : `
+          <p>Como cliente, ahora podés:</p>
+          <ul style="line-height:1.8;">
+            <li>Buscar profesionales en tu zona</li>
+            <li>Ver reseñas y calificaciones</li>
+            <li>Reservar servicios fácilmente</li>
+          </ul>
+        `}
+        <p style="margin-top:24px;">Cualquier consulta, escribinos respondiendo este mail.</p>
+        <p style="color:#94a3b8;font-size:13px;margin-top:32px;">El equipo de Changuita</p>
+      </div>
+    `,
+  });
+};
 module.exports = { sendVerificationEmail, sendWelcomeEmail };
