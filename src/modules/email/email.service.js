@@ -15,10 +15,7 @@ const sendVerificationEmail = async (email, name, token, type = 'verify') => {
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
           <h2 style="color: #3898EC;">Recuperar contraseña</h2>
           <p>Hola ${name}, recibimos una solicitud para restablecer tu contraseña.</p>
-          <a href="${resetUrl}" 
-             style="background-color: #FF6B35; color: white; padding: 14px 24px; 
-                    border-radius: 8px; text-decoration: none; display: inline-block; 
-                    font-weight: bold; margin: 16px 0;">
+          <a href="${resetUrl}" style="background-color: #FF6B35; color: white; padding: 14px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 16px 0;">
             Restablecer contraseña
           </a>
           <p style="color: #999; font-size: 12px;">Este link expira en 1 hora.</p>
@@ -51,10 +48,7 @@ const sendVerificationEmail = async (email, name, token, type = 'verify') => {
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
           <h2 style="color: #3898EC;">¡Bienvenido a Changuita, ${name}!</h2>
           <p>Para activar tu cuenta hacé clic en el botón de abajo:</p>
-          <a href="${verificationUrl}" 
-             style="background-color: #3898EC; color: white; padding: 14px 24px; 
-                    border-radius: 8px; text-decoration: none; display: inline-block; 
-                    font-weight: bold; margin: 16px 0;">
+          <a href="${verificationUrl}" style="background-color: #3898EC; color: white; padding: 14px 24px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: bold; margin: 16px 0;">
             Verificar mi cuenta
           </a>
           <p style="color: #999; font-size: 12px;">Este link expira en 24 horas.</p>
@@ -65,26 +59,12 @@ const sendVerificationEmail = async (email, name, token, type = 'verify') => {
   }
 };
 
-const sendWelcomeEmail = async (email, name) => {
-  await resend.emails.send({
-    from: FROM,
-    to: email,
-    subject: '🎉 ¡Tu cuenta está lista en Changuita!',
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
-        <h2 style="color: #3898EC;">¡Cuenta verificada, ${name}!</h2>
-        <p>Ya podés usar Changuita para encontrar o ofrecer servicios.</p>
-        <p style="color: #999; font-size: 12px;">El equipo de Changuita</p>
-      </div>
-    `,
-  });
-};
 const sendWelcomeEmail = async (email, name, role) => {
   const esProfesional = role === 'professional';
   await resend.emails.send({
     from: FROM,
     to: email,
-    subject: `¡Bienvenido a Changuita${esProfesional ? ', '+name+'!' : '!'}`,
+    subject: `¡Bienvenido a Changuita, ${name}!`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
         <h2 style="color: #3898EC;">¡Hola ${name}! 👋</h2>
@@ -114,4 +94,5 @@ const sendWelcomeEmail = async (email, name, role) => {
     `,
   });
 };
+
 module.exports = { sendVerificationEmail, sendWelcomeEmail };
