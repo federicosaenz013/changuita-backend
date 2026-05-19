@@ -95,4 +95,20 @@ const sendWelcomeEmail = async (email, name, role) => {
   });
 };
 
-module.exports = { sendVerificationEmail, sendWelcomeEmail };
+const sendPlanExpiredEmail = async (email, name) => {
+  await resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: 'Tu plan de Changuita venció',
+    html: `
+      <div style="font-family:Arial;max-width:500px;margin:0 auto;padding:20px;">
+        <h2 style="color:#3898EC;">Hola ${name}</h2>
+        <p>Tu plan venció y tu cuenta pasó automáticamente al plan <strong>Free</strong>.</p>
+        <p>Con el plan Free podés tener 1 servicio activo y hasta 5 reservas por mes. Si querés volver a tus beneficios anteriores, renová desde la app.</p>
+        <p style="color:#94a3b8;font-size:13px;margin-top:24px;">El equipo de Changuita</p>
+      </div>
+    `,
+  });
+};
+
+module.exports = { sendVerificationEmail, sendWelcomeEmail, sendPlanExpiredEmail };

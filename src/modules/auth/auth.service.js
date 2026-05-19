@@ -20,7 +20,7 @@ const generateTokens = (userId, role) => {
   return { accessToken, refreshToken };
 };
 
-const register = async ({ name, email, phone, password, role }) => {
+const register = async ({ name, email, phone, password, role, plan }) => {
   const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
   if (existing.rows.length > 0) {
     const error = new Error('Ya existe una cuenta con ese email');
@@ -51,10 +51,14 @@ const register = async ({ name, email, phone, password, role }) => {
   }
 
   if (role === 'professional') {
-    await db.query('INSERT INTO professional_profiles (user_id) VALUES ($1)', [user.id]);
+    const planElegido = ['basico', 'medio', 'full'].includes(plan) ? plan : 'free';
+    await db.query(
+      'INSERT INTO professional_profiles (user_id, plan) VALUES ($1, $2)',
+      [user.id, planElegido]
+    );
     try {
       const { assignTrial } = require('../subscriptions/subscriptions.service');
-      await assignTrial(user.id);
+      await assignTrial(user.id, planElegido);
     } catch (e) {
       console.log('Error asignando trial:', e.message);
     }

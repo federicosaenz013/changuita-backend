@@ -88,4 +88,10 @@ const mpPending = (req, res) => {
   `);
 };
 
-module.exports = { getMyPlan, getPlanes, subscribeToPlan, mpSuccess, mpFailure, mpPending };
+const getStatus = async (req, res, next) => {
+  try {
+    const data = await subscriptionsService.getStatus(req.user.id);
+    res.json(data);
+  } catch (err) { next(err); }
+};
+module.exports = { getMyPlan, getPlanes, subscribeToPlan, mpSuccess, mpFailure, mpPending, getStatus };

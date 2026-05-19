@@ -69,27 +69,54 @@ const checkExpiredSubscriptions = async () => {
   }
 };
 
-const assignTrial = async (professionalId) => {
-  // Contar profesionales registrados para ver si es early adopter
-  const count = await db.query(
-    `SELECT COUNT(*) FROM professional_profiles`
-  );
+const assignTrial = async (professionalId, planElegido = 'free') => {
+  const count = await db.query(`SELECT COUNT(*) FROM professional_profiles`);
   const totalProfesionales = parseInt(count.rows[0].count);
   const diasTrial = totalProfesionales <= LIMITE_EARLY_ADOPTERS ? PRIMEROS_200_DIAS : TRIAL_DIAS;
   const expires = new Date(Date.now() + diasTrial * 24 * 60 * 60 * 1000);
 
+  const planValido = ['free', 'basico', 'medio', 'full'].includes(planElegido) ? planElegido : 'free';
+
   await db.query(
     `INSERT INTO subscriptions (professional_id, plan, status, expires_at)
-     VALUES ($1, 'free', 'trial', $2)
+     VALUES ($1, $2, 'trial', $3)
      ON CONFLICT DO NOTHING`,
-    [professionalId, expires]
+    [professionalId, planValido, expires]
   );
 
   await db.query(
-    `UPDATE professional_profiles SET plan = 'free' WHERE user_id = $1`,
-    [professionalId]
+    `UPDATE professional_profiles SET plan = $1 WHERE user_id = $2`,
+    [planValido, professionalId]
   );
 
-  return { dias_trial: diasTrial, expires };
+  return { dias_trial: diasTrial, expires, plan: planValido };
+};
+const getStatus = async (professionalId) => {
+  const result = await db.query(
+    `SELECT s.plan, s.status, s.expires_at, pp.sanctioned
+     FROM professional_profiles pp
+     LEFT JOIN subscriptions s ON s.professional_id = pp.user_id AND s.status IN ('active','trial')
+     WHERE pp.user_id = $1
+     ORDER BY s.created_at DESC LIMIT 1`,
+    [professionalId]
+  );
+  const row = result.rows[0];
+  if (!row) return { plan: 'free', diasRestantes: null, vencido: false, porVencer: false };
+
+  let diasRestantes = null;
+  if (row.expires_at) {
+    const now = new Date();
+    const expira = new Date(row.expires_at);
+    diasRestantes = Math.ceil((expira - now) / (1000 * 60 * 60 * 24));
+  }
+
+  return {
+    plan: row.plan || 'free',
+    status: row.status,
+    diasRestantes,
+    vencido: diasRestantes !== null && diasRestantes < 0,
+    porVencer: diasRestantes !== null && diasRestantes <= 7 && diasRestantes >= 0,
+    sanctioned: row.sanctioned || false,
+  };
 };
 module.exports = { getPlan, updatePlan, checkExpiredSubscriptions, assignTrial, PLANES };
