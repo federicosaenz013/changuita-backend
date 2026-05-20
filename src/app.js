@@ -66,7 +66,7 @@ app.get('/admin/dashboard', async (req, res) => {
     const [users, bookings, pendingDni, sanctions, professionals, ingresos] = await Promise.all([
       db.query(`SELECT COUNT(*) FROM users`),
       db.query(`SELECT COUNT(*) FROM bookings`),
-      db.query(`SELECT u.id, u.name, u.email, pp.dni_photo, pp.verification_status FROM professional_profiles pp JOIN users u ON pp.user_id = u.id WHERE pp.dni_photo IS NOT NULL ORDER BY pp.verification_status`),
+      db.query(`SELECT u.id, u.name, u.email, pp.dni_photo, pp.verification_status FROM professional_profiles pp JOIN users u ON pp.user_id = u.id WHERE pp.dni_photo IS NOT NULL ORDER BY CASE pp.verification_status WHEN 'pending' THEN 1 WHEN 'verified' THEN 2 ELSE 3 END`),
       db.query(`SELECT s.*, u.name FROM sanctions s JOIN users u ON s.professional_id = u.id WHERE s.status = 'active'`),
       db.query(`SELECT u.name, u.email, pp.plan, pp.verification_status, pp.sanctioned, (SELECT COUNT(*) FROM bookings b WHERE b.professional_id = u.id AND b.status = 'completed') as trabajos FROM users u JOIN professional_profiles pp ON pp.user_id = u.id WHERE u.role = 'professional' ORDER BY CASE pp.plan WHEN 'full' THEN 1 WHEN 'medio' THEN 2 WHEN 'basico' THEN 3 ELSE 4 END`),
       db.query(`SELECT plan, COUNT(*) as cantidad FROM professional_profiles WHERE plan != 'free' GROUP BY plan`),
@@ -79,7 +79,9 @@ app.get('/admin/dashboard', async (req, res) => {
       ingresoMensual += (precios[r.plan] || 0) * parseInt(r.cantidad);
     });
 
-    const dniRows = pendingDni.rows.map(p => `
+    const filtro = req.query.filtro;
+    const dnisFiltrados = filtro ? pendingDni.rows.filter(p => p.verification_status === filtro) : pendingDni.rows;
+    const dniRows = dnisFiltrados.map(p => `
       <tr>
         <td style="padding:10px;border-bottom:1px solid #eee;">${p.name}</td>
         <td style="padding:10px;border-bottom:1px solid #eee;">${p.email}</td>
@@ -171,6 +173,12 @@ app.get('/admin/dashboard', async (req, res) => {
 
           <div style="background:white;border-radius:12px;padding:24px;margin-bottom:24px;border:1px solid #e2e8f0;">
             <h2 style="margin:0 0 16px;font-size:18px;color:#1e293b;">📋 Verificación de DNIs</h2>
+            <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+              <a href="/admin/dashboard?password=${ADMIN_PASSWORD}&filtro=pending" style="padding:6px 14px;border-radius:999px;background:${req.query.filtro==='pending'?'#f59e0b':'#f8fafc'};color:${req.query.filtro==='pending'?'white':'#64748b'};text-decoration:none;font-size:13px;font-weight:600;border:1px solid #e2e8f0;">⏳ Pendientes (${pendingDni.rows.filter(p=>p.verification_status==='pending').length})</a>
+              <a href="/admin/dashboard?password=${ADMIN_PASSWORD}&filtro=verified" style="padding:6px 14px;border-radius:999px;background:${req.query.filtro==='verified'?'#22c55e':'#f8fafc'};color:${req.query.filtro==='verified'?'white':'#64748b'};text-decoration:none;font-size:13px;font-weight:600;border:1px solid #e2e8f0;">✅ Verificados (${pendingDni.rows.filter(p=>p.verification_status==='verified').length})</a>
+              <a href="/admin/dashboard?password=${ADMIN_PASSWORD}&filtro=rejected" style="padding:6px 14px;border-radius:999px;background:${req.query.filtro==='rejected'?'#ef4444':'#f8fafc'};color:${req.query.filtro==='rejected'?'white':'#64748b'};text-decoration:none;font-size:13px;font-weight:600;border:1px solid #e2e8f0;">❌ Rechazados (${pendingDni.rows.filter(p=>p.verification_status==='rejected').length})</a>
+              <a href="/admin/dashboard?password=${ADMIN_PASSWORD}" style="padding:6px 14px;border-radius:999px;background:${!req.query.filtro?'#3898EC':'#f8fafc'};color:${!req.query.filtro?'white':'#64748b'};text-decoration:none;font-size:13px;font-weight:600;border:1px solid #e2e8f0;">Todos</a>
+            </div>
             <table style="width:100%;border-collapse:collapse;">
               <thead>
                 <tr style="background:#f8fafc;">
@@ -181,7 +189,7 @@ app.get('/admin/dashboard', async (req, res) => {
                   <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Acción</th>
                 </tr>
               </thead>
-              <tbody>${dniRows || '<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No hay DNIs para verificar</td></tr>'}</tbody>
+              <tbody>${dniRows.length ? dniRows.join('') : '<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No hay DNIs en esta categoría</td></tr>'}</tbody>
             </table>
           </div>
 
@@ -263,6 +271,47 @@ app.get('/setup/get-push-token', async (req, res) => {
   const { user_id } = req.query;
   const result = await db.query('SELECT token FROM push_tokens WHERE user_id = $1', [user_id]);
   res.json({ token: result.rows[0]?.token });
+});
+
+app.get('/setup/notify-incomplete-profiles', async (req, res) => {
+  const db = require('./config/database');
+  try {
+    const result = await db.query(`
+      SELECT u.id, u.name, pt.token
+      FROM users u
+      JOIN professional_profiles pp ON pp.user_id = u.id
+      JOIN push_tokens pt ON pt.user_id = u.id
+      WHERE u.role = 'professional'
+        AND u.created_at > NOW() - INTERVAL '7 days'
+        AND (pp.description IS NULL OR pp.description = ''
+             OR pp.latitude IS NULL OR pp.dni_photo IS NULL
+             OR pp.profile_photo IS NULL)
+    `);
+
+    const { Expo } = require('expo-server-sdk');
+    const expo = new Expo();
+    const messages = [];
+
+    for (const u of result.rows) {
+      if (!Expo.isExpoPushToken(u.token)) continue;
+      messages.push({
+        to: u.token,
+        sound: 'default',
+        title: 'Completá tu perfil 📋',
+        body: `${u.name}, te falta completar tu perfil para empezar a recibir clientes.`,
+        data: { screen: 'EditProfessionalProfile' },
+      });
+    }
+
+    const chunks = expo.chunkPushNotifications(messages);
+    for (const chunk of chunks) {
+      try { await expo.sendPushNotificationsAsync(chunk); } catch {}
+    }
+
+    res.json({ ok: true, enviados: messages.length });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 app.get('/setup/check-expiring', async (req, res) => {
