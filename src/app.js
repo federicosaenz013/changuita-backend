@@ -63,16 +63,16 @@ app.get('/admin/dashboard', async (req, res) => {
   if (password !== ADMIN_PASSWORD) return res.redirect('/admin');
   const db = require('./config/database');
   try {
-    const [users, bookings, pendingDni, sanctions, professionals, ingresos] = await Promise.all([
+    const [users, bookings, pendingDni, sanctions, professionals, ingresos, reports] = await Promise.all([
       db.query(`SELECT COUNT(*) FROM users`),
       db.query(`SELECT COUNT(*) FROM bookings`),
       db.query(`SELECT u.id, u.name, u.email, pp.dni_photo, pp.verification_status FROM professional_profiles pp JOIN users u ON pp.user_id = u.id WHERE pp.dni_photo IS NOT NULL ORDER BY CASE pp.verification_status WHEN 'pending' THEN 1 WHEN 'verified' THEN 2 ELSE 3 END`),
       db.query(`SELECT s.*, u.name FROM sanctions s JOIN users u ON s.professional_id = u.id WHERE s.status = 'active'`),
       db.query(`SELECT u.name, u.email, pp.plan, pp.verification_status, pp.sanctioned, (SELECT COUNT(*) FROM bookings b WHERE b.professional_id = u.id AND b.status = 'completed') as trabajos FROM users u JOIN professional_profiles pp ON pp.user_id = u.id WHERE u.role = 'professional' ORDER BY CASE pp.plan WHEN 'full' THEN 1 WHEN 'medio' THEN 2 WHEN 'basico' THEN 3 ELSE 4 END`),
       db.query(`SELECT plan, COUNT(*) as cantidad FROM professional_profiles WHERE plan != 'free' GROUP BY plan`),
+      db.query(`SELECT r.*, u1.name as reporter_name, u2.name as reported_name FROM reports r JOIN users u1 ON u1.id = r.reporter_id JOIN users u2 ON u2.id = r.reported_user_id WHERE r.status = 'pending' ORDER BY r.created_at DESC LIMIT 20`).catch(() => ({ rows: [] })),
     ]);
 
-    // Calcular ingresos estimados
     const precios = { basico: 3000, medio: 5000, full: 7000 };
     let ingresoMensual = 0;
     ingresos.rows.forEach(r => {
@@ -81,6 +81,7 @@ app.get('/admin/dashboard', async (req, res) => {
 
     const filtro = req.query.filtro;
     const dnisFiltrados = filtro ? pendingDni.rows.filter(p => p.verification_status === filtro) : pendingDni.rows;
+
     const dniRows = dnisFiltrados.map(p => `
       <tr>
         <td style="padding:10px;border-bottom:1px solid #eee;">${p.name}</td>
@@ -123,6 +124,19 @@ app.get('/admin/dashboard', async (req, res) => {
       </tr>
     `).join('');
 
+    const reportRows = reports.rows.map(r => `
+      <tr>
+        <td style="padding:10px;border-bottom:1px solid #eee;font-size:13px;">${r.reporter_name}</td>
+        <td style="padding:10px;border-bottom:1px solid #eee;font-size:13px;font-weight:600;">${r.reported_name}</td>
+        <td style="padding:10px;border-bottom:1px solid #eee;font-size:13px;">${r.reason}</td>
+        <td style="padding:10px;border-bottom:1px solid #eee;font-size:12px;color:#64748b;">${r.details || '-'}</td>
+        <td style="padding:10px;border-bottom:1px solid #eee;">
+          <a href="/admin/resolve-report?id=${r.id}&action=dismiss&password=${ADMIN_PASSWORD}" style="background:#94a3b8;color:white;padding:5px 10px;border-radius:6px;text-decoration:none;font-size:12px;margin-right:4px;">Ignorar</a>
+          <a href="/admin/resolve-report?id=${r.id}&action=warn&password=${ADMIN_PASSWORD}" style="background:#f59e0b;color:white;padding:5px 10px;border-radius:6px;text-decoration:none;font-size:12px;">Advertir</a>
+        </td>
+      </tr>
+    `).join('');
+
     res.send(`
       <html>
       <head><title>Admin Changuita</title></head>
@@ -158,15 +172,13 @@ app.get('/admin/dashboard', async (req, res) => {
           <div style="background:white;border-radius:12px;padding:24px;margin-bottom:24px;border:1px solid #e2e8f0;">
             <h2 style="margin:0 0 16px;font-size:18px;color:#1e293b;">👷 Profesionales (${professionals.rows.length})</h2>
             <table style="width:100%;border-collapse:collapse;">
-              <thead>
-                <tr style="background:#f8fafc;">
-                  <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Nombre</th>
-                  <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Email</th>
-                  <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Plan</th>
-                  <th style="padding:10px;text-align:center;font-size:13px;color:#64748b;">Trabajos</th>
-                  <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Estado</th>
-                </tr>
-              </thead>
+              <thead><tr style="background:#f8fafc;">
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Nombre</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Email</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Plan</th>
+                <th style="padding:10px;text-align:center;font-size:13px;color:#64748b;">Trabajos</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Estado</th>
+              </tr></thead>
               <tbody>${profRows || '<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No hay profesionales</td></tr>'}</tbody>
             </table>
           </div>
@@ -180,33 +192,46 @@ app.get('/admin/dashboard', async (req, res) => {
               <a href="/admin/dashboard?password=${ADMIN_PASSWORD}" style="padding:6px 14px;border-radius:999px;background:${!req.query.filtro?'#3898EC':'#f8fafc'};color:${!req.query.filtro?'white':'#64748b'};text-decoration:none;font-size:13px;font-weight:600;border:1px solid #e2e8f0;">Todos</a>
             </div>
             <table style="width:100%;border-collapse:collapse;">
-              <thead>
-                <tr style="background:#f8fafc;">
-                  <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Nombre</th>
-                  <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Email</th>
-                  <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">DNI</th>
-                  <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Estado</th>
-                  <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Acción</th>
-                </tr>
-              </thead>
-              <tbody>${dniRows.length ? dniRows.join('') : '<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No hay DNIs en esta categoría</td></tr>'}</tbody>
+              <thead><tr style="background:#f8fafc;">
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Nombre</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Email</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">DNI</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Estado</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Acción</th>
+              </tr></thead>
+              <tbody>${dniRows.length ? dniRows : '<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No hay DNIs en esta categoría</td></tr>'}</tbody>
             </table>
           </div>
 
-          <div style="background:white;border-radius:12px;padding:24px;border:1px solid #e2e8f0;">
+          <div style="background:white;border-radius:12px;padding:24px;margin-bottom:24px;border:1px solid #e2e8f0;">
             <h2 style="margin:0 0 16px;font-size:18px;color:#1e293b;">⚠️ Sanciones activas</h2>
             <table style="width:100%;border-collapse:collapse;">
-              <thead>
-                <tr style="background:#f8fafc;">
-                  <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Profesional</th>
-                  <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Tipo</th>
-                  <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Motivo</th>
-                  <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Acción</th>
-                </tr>
-              </thead>
+              <thead><tr style="background:#f8fafc;">
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Profesional</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Tipo</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Motivo</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Acción</th>
+              </tr></thead>
               <tbody>${sanctionRows || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No hay sanciones activas</td></tr>'}</tbody>
             </table>
           </div>
+
+          ${reports.rows.length > 0 ? `
+          <div style="background:white;border-radius:12px;padding:24px;margin-bottom:24px;border:1px solid #e2e8f0;">
+            <h2 style="margin:0 0 16px;font-size:18px;color:#1e293b;">🚩 Reportes pendientes (${reports.rows.length})</h2>
+            <table style="width:100%;border-collapse:collapse;">
+              <thead><tr style="background:#f8fafc;">
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Reportado por</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Reportado</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Motivo</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Detalles</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Acción</th>
+              </tr></thead>
+              <tbody>${reportRows}</tbody>
+            </table>
+          </div>
+          ` : ''}
+
         </div>
       </body>
       </html>
@@ -222,6 +247,22 @@ app.get('/admin/verify', async (req, res) => {
   const db = require('./config/database');
   try {
     await db.query(`UPDATE professional_profiles SET verification_status = $1 WHERE user_id = $2`, [action, id]);
+    if (action === 'verified') {
+      const pushRes = await db.query('SELECT token FROM push_tokens WHERE user_id = $1', [id]);
+      if (pushRes.rows[0]?.token) {
+        try {
+          const { Expo } = require('expo-server-sdk');
+          const expo = new Expo();
+          await expo.sendPushNotificationsAsync([{
+            to: pushRes.rows[0].token,
+            sound: 'default',
+            title: '✅ Identidad verificada',
+            body: '¡Tu DNI fue aprobado! Ya podés usar todas las funciones de Changuita.',
+            data: { screen: 'ProfessionalDashboard' },
+          }]);
+        } catch (e) { console.log('Error push DNI verificado:', e.message); }
+      }
+    }
     if (action === 'rejected') {
       await db.query(`UPDATE users SET is_active = false WHERE id = $1`, [id]);
       const userRes = await db.query(`SELECT name, email FROM users WHERE id = $1`, [id]);
@@ -230,9 +271,7 @@ app.get('/admin/verify', async (req, res) => {
         const { name, email } = userRes.rows[0];
         try {
           await sendVerificationEmail(email, name, null, 'rejected');
-        } catch (e) {
-          console.log('Error enviando mail de rechazo:', e.message);
-        }
+        } catch (e) { console.log('Error enviando mail de rechazo:', e.message); }
       }
     }
     res.redirect(`/admin/dashboard?password=${ADMIN_PASSWORD}`);
@@ -248,6 +287,18 @@ app.get('/admin/unsanction', async (req, res) => {
   try {
     await db.query(`UPDATE sanctions SET status = 'resolved', resolved_at = NOW() WHERE id = $1`, [id]);
     await db.query(`UPDATE professional_profiles SET sanctioned = false, sanction_expires_at = null, is_available = true WHERE user_id = $1`, [professional_id]);
+    res.redirect(`/admin/dashboard?password=${ADMIN_PASSWORD}`);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/admin/resolve-report', async (req, res) => {
+  const { id, action, password } = req.query;
+  if (password !== ADMIN_PASSWORD) return res.redirect('/admin');
+  const db = require('./config/database');
+  try {
+    await db.query(`UPDATE reports SET status = $1 WHERE id = $2`, [action === 'warn' ? 'warned' : 'dismissed', id]);
     res.redirect(`/admin/dashboard?password=${ADMIN_PASSWORD}`);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -287,11 +338,9 @@ app.get('/setup/notify-incomplete-profiles', async (req, res) => {
              OR pp.latitude IS NULL OR pp.dni_photo IS NULL
              OR pp.profile_photo IS NULL)
     `);
-
     const { Expo } = require('expo-server-sdk');
     const expo = new Expo();
     const messages = [];
-
     for (const u of result.rows) {
       if (!Expo.isExpoPushToken(u.token)) continue;
       messages.push({
@@ -302,12 +351,10 @@ app.get('/setup/notify-incomplete-profiles', async (req, res) => {
         data: { screen: 'EditProfessionalProfile' },
       });
     }
-
     const chunks = expo.chunkPushNotifications(messages);
     for (const chunk of chunks) {
       try { await expo.sendPushNotificationsAsync(chunk); } catch {}
     }
-
     res.json({ ok: true, enviados: messages.length });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -325,30 +372,18 @@ app.get('/setup/check-expiring', async (req, res) => {
         AND s.expires_at IS NOT NULL
         AND s.expires_at::date = (NOW() + INTERVAL '7 days')::date
     `);
-
     const { Resend } = require('resend');
     const resend = new Resend(process.env.RESEND_API_KEY);
-
     for (const u of result.rows) {
       try {
         await resend.emails.send({
           from: 'Changuita <no-reply@appchanguita.com.ar>',
           to: u.email,
           subject: '⏰ Tu plan de Changuita vence en 7 días',
-          html: `
-            <div style="font-family:Arial;max-width:500px;margin:0 auto;padding:20px;">
-              <h2 style="color:#3898EC;">Hola ${u.name}</h2>
-              <p>Tu plan <strong>${u.plan}</strong> vence en 7 días.</p>
-              <p>Renová desde la app para no perder los beneficios. Si no renovás, tu cuenta pasará automáticamente a Free.</p>
-              <p style="color:#94a3b8;font-size:13px;margin-top:24px;">El equipo de Changuita</p>
-            </div>
-          `,
+          html: `<div style="font-family:Arial;max-width:500px;margin:0 auto;padding:20px;"><h2 style="color:#3898EC;">Hola ${u.name}</h2><p>Tu plan <strong>${u.plan}</strong> vence en 7 días.</p><p>Renová desde la app para no perder los beneficios.</p><p style="color:#94a3b8;font-size:13px;">El equipo de Changuita</p></div>`,
         });
-      } catch (e) {
-        console.log('Error mail vencimiento:', e.message);
-      }
+      } catch (e) { console.log('Error mail vencimiento:', e.message); }
     }
-
     res.json({ ok: true, enviados: result.rows.length });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -366,48 +401,67 @@ app.get('/setup/downgrade-expired', async (req, res) => {
         AND s.expires_at IS NOT NULL
         AND s.expires_at < NOW()
     `);
-
-    await db.query(`
-      UPDATE subscriptions
-      SET status = 'expired'
-      WHERE status IN ('active','trial')
-        AND expires_at IS NOT NULL
-        AND expires_at < NOW()
-    `);
-
+    await db.query(`UPDATE subscriptions SET status = 'expired' WHERE status IN ('active','trial') AND expires_at IS NOT NULL AND expires_at < NOW()`);
     for (const row of expired.rows) {
-      await db.query(
-        `UPDATE professional_profiles SET plan = 'free' WHERE user_id = $1`,
-        [row.professional_id]
-      );
+      await db.query(`UPDATE professional_profiles SET plan = 'free' WHERE user_id = $1`, [row.professional_id]);
     }
-
     const { sendPlanExpiredEmail } = require('./modules/email/email.service');
     for (const u of expired.rows) {
       try { await sendPlanExpiredEmail(u.email, u.name); } catch {}
     }
-
     res.json({ ok: true, bajados: expired.rows.length });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+
+app.post('/api/reports', async (req, res) => {
+  const db = require('./config/database');
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'No autorizado' });
+  try {
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const { reported_user_id, reason, details } = req.body;
+    if (!reported_user_id || !reason) return res.status(400).json({ error: 'Faltan datos' });
+    await db.query(
+      `INSERT INTO reports (reporter_id, reported_user_id, reason, details, created_at) VALUES ($1, $2, $3, $4, NOW())`,
+      [decoded.userId, reported_user_id, reason, details || null]
+    );
+    res.json({ ok: true, message: 'Reporte enviado' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/setup/migrate-reports', async (req, res) => {
+  const db = require('./config/database');
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS reports (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        reporter_id UUID REFERENCES users(id),
+        reported_user_id UUID REFERENCES users(id),
+        reason VARCHAR(100) NOT NULL,
+        details TEXT,
+        status VARCHAR(20) DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/setup/fix-ratings', async (req, res) => {
   const db = require('./config/database');
   try {
     await db.query(`
       UPDATE professional_profiles pp
       SET
-        rating = COALESCE((
-          SELECT ROUND(AVG(r.rating)::numeric, 2)
-          FROM reviews r
-          WHERE r.professional_id = pp.user_id
-        ), 0),
-        reviews_count = COALESCE((
-          SELECT COUNT(*)
-          FROM reviews r
-          WHERE r.professional_id = pp.user_id
-        ), 0),
+        rating = COALESCE((SELECT ROUND(AVG(r.rating)::numeric, 2) FROM reviews r WHERE r.professional_id = pp.user_id), 0),
+        reviews_count = COALESCE((SELECT COUNT(*) FROM reviews r WHERE r.professional_id = pp.user_id), 0),
         updated_at = NOW()
     `);
     res.json({ ok: true, message: 'Ratings actualizados correctamente' });
