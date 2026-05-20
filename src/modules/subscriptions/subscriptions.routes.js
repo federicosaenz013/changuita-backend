@@ -5,7 +5,8 @@ const { authenticate, requireRole } = require('../../middleware/auth');
 
 router.get('/planes',    controller.getPlanes);
 router.get('/my',        authenticate, requireRole('professional'), controller.getMyPlan);
-router.get('/status', authenticate, subscriptionsController.getStatus);
+router.get('/status',    authenticate, controller.getStatus);
+router.get('/history',   authenticate, requireRole('professional'), controller.getHistory);
 router.post('/subscribe', authenticate, requireRole('professional'), controller.subscribeToPlan);
 router.get('/mp-success', controller.mpSuccess);
 router.get('/mp-failure', controller.mpFailure);

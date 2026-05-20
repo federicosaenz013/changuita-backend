@@ -94,4 +94,16 @@ const getStatus = async (req, res, next) => {
     res.json(data);
   } catch (err) { next(err); }
 };
-module.exports = { getMyPlan, getPlanes, subscribeToPlan, mpSuccess, mpFailure, mpPending, getStatus };
+const getHistory = async (req, res, next) => {
+  try {
+    const db = require('../../config/database');
+    const result = await db.query(
+      `SELECT plan, status, created_at, expires_at, mp_payment_id
+       FROM subscriptions WHERE professional_id = $1
+       ORDER BY created_at DESC LIMIT 20`,
+      [req.user.id]
+    );
+    res.json({ history: result.rows });
+  } catch (err) { next(err); }
+};
+module.exports = { getMyPlan, getPlanes, subscribeToPlan, mpSuccess, mpFailure, mpPending, getStatus, getHistory };
