@@ -454,6 +454,16 @@ app.get('/setup/migrate-reports', async (req, res) => {
   }
 });
 
+app.get('/setup/migrate-verification-status', async (req, res) => {
+  const db = require('./config/database');
+  try {
+    await db.query(`ALTER TABLE professional_profiles ALTER COLUMN verification_status TYPE VARCHAR(20)`);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 app.get('/setup/fix-ratings', async (req, res) => {
   const db = require('./config/database');
   try {
