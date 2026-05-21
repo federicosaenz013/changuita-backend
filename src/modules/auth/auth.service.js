@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const db     = require('../../config/database');
 const { sendVerificationEmail } = require('../email/email.service');
 
-const EMAIL_VERIFICATION_ENABLED = false;
+const EMAIL_VERIFICATION_ENABLED = true;
 
 const generateTokens = (userId, role) => {
   const accessToken = jwt.sign(
