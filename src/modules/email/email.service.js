@@ -6,6 +6,7 @@ const FROM = 'Changuita <no-reply@appchanguita.com.ar>';
 
 const sendVerificationEmail = async (email, name, token, type = 'verify') => {
   if (type === 'reset') {
+    console.log('sendVerificationEmail reset - token:', token, 'email:', email);
     const resetUrl = `https://changuita-backend-1.onrender.com/api/auth/reset-password?token=${token}`;
     await resend.emails.send({
       from: FROM,
