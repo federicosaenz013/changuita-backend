@@ -3,12 +3,14 @@ const router     = express.Router();
 const controller = require('./auth.controller');
 const { authenticate } = require('../../middleware/auth');
 
-router.post('/register', controller.register);
-router.post('/login',    controller.login);
-router.post('/logout',   controller.logout);
-router.get('/me',        authenticate, controller.me);
-router.get('/verify-email', controller.verifyEmail);
-router.post('/google', controller.googleLogin);
-router.post('/forgot-password', controller.forgotPassword);
+router.post('/register',         controller.register);
+router.post('/login',            controller.login);
+router.post('/logout',           controller.logout);
+router.get('/me',                authenticate, controller.me);
+router.get('/verify-email',      controller.verifyEmail);
+router.post('/google',           controller.googleLogin);
+router.post('/forgot-password',  controller.forgotPassword);
+router.get('/reset-password',    controller.resetPasswordForm);
+router.post('/reset-password',   controller.resetPassword);
 
 module.exports = router;
