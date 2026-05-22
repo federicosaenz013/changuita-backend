@@ -1,5 +1,7 @@
 const db = require('../../config/database');
 
+const { createNotification } = require('../notifications/notifications.helper');
+
 const create = async (clientId, data) => {
   const { service_id, professional_id, scheduled_date, scheduled_time, location_text, notes } = data;
 
@@ -164,12 +166,22 @@ const updateStatus = async (bookingId, userId, status, rejectionReason = null) =
     throw error;
   }
 
-  return result.rows[0];
+  const booking = result.rows[0];
+  try {
+    if (status === 'accepted') {
+      await createNotification(booking.client_id, '✅ Reserva aceptada', `Tu reserva fue aceptada. ¡Ya podés coordinar con el profesional!`, 'booking', { bookingId: booking.id });
+    } else if (status === 'rejected') {
+      await createNotification(booking.client_id, '❌ Reserva rechazada', `Tu reserva fue rechazada. Podés buscar otro profesional.`, 'booking', { bookingId: booking.id });
+    } else if (status === 'completed') {
+      await createNotification(booking.client_id, '⭐ Trabajo completado', `El trabajo fue completado. ¡Dejá tu reseña!`, 'booking', { bookingId: booking.id });
+    }
+  } catch {}
+  return booking;
 };
 
 const cancel = async (bookingId, userId) => {
-  const booking = await db.query(`SELECT client_id, professional_id FROM bookings WHERE id = $1`, [bookingId]);
-  const b = booking.rows[0];
+  const prevBooking = await db.query(`SELECT client_id, professional_id FROM bookings WHERE id = $1`, [bookingId]);
+  const b = prevBooking.rows[0];
   const cancelledBy = b?.client_id === userId ? 'client' : 'professional';
 
   const result = await db.query(
@@ -186,7 +198,13 @@ const cancel = async (bookingId, userId) => {
     throw error;
   }
 
-  return result.rows[0];
+  const booking = result.rows[0];
+  try {
+    const notifyId = booking.client_id === userId ? booking.professional_id : booking.client_id;
+    const quienCancelo = booking.client_id === userId ? 'El cliente' : 'El profesional';
+    await createNotification(notifyId, '🚫 Reserva cancelada', `${quienCancelo} canceló la reserva.`, 'booking', { bookingId: booking.id });
+  } catch {}
+  return booking;
 };
 
 const markSeenByClient = async (bookingId, userId) => {

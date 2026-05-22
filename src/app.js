@@ -217,6 +217,21 @@ app.get('/admin/dashboard', async (req, res) => {
             </table>
           </div>
 
+          <div style="background:white;border-radius:12px;padding:24px;margin-bottom:24px;border:1px solid #e2e8f0;">
+            <h2 style="margin:0 0 16px;font-size:18px;color:#1e293b;">📢 Enviar notificación</h2>
+            <form method="POST" action="/admin/notify-all" style="display:flex;flex-direction:column;gap:12px;">
+              <input type="hidden" name="password" value="${ADMIN_PASSWORD}" />
+              <input name="title" placeholder="Título" required style="padding:10px;border-radius:8px;border:1px solid #e2e8f0;font-size:14px;" />
+              <textarea name="body" placeholder="Mensaje" required style="padding:10px;border-radius:8px;border:1px solid #e2e8f0;font-size:14px;height:80px;resize:none;"></textarea>
+              <select name="role" style="padding:10px;border-radius:8px;border:1px solid #e2e8f0;font-size:14px;">
+                <option value="">Todos los usuarios</option>
+                <option value="professional">Solo profesionales</option>
+                <option value="client">Solo clientes</option>
+              </select>
+              <button type="submit" style="background:#3898EC;color:white;padding:12px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">Enviar notificación</button>
+            </form>
+          </div>
+
           ${reports.rows.length > 0 ? `
           <div style="background:white;border-radius:12px;padding:24px;margin-bottom:24px;border:1px solid #e2e8f0;">
             <h2 style="margin:0 0 16px;font-size:18px;color:#1e293b;">🚩 Reportes pendientes (${reports.rows.length})</h2>
@@ -248,8 +263,8 @@ app.get('/admin/verify', async (req, res) => {
   const db = require('./config/database');
   try {
     await db.query(`UPDATE professional_profiles SET verification_status = $1 WHERE user_id = $2`, [action, id]);
-    if (action === 'verified') {
-      const pushRes = await db.query('SELECT token FROM push_tokens WHERE user_id = $1', [id]);
+    const { createNotification } = require('./modules/notifications/notifications.helper');
+    await createNotification(id, '✅ Identidad verificada', '¡Tu DNI fue aprobado! Ya podés usar todas las funciones de Changuita.', 'system').catch(() => {});
       if (pushRes.rows[0]?.token) {
         try {
           const { Expo } = require('expo-server-sdk');
@@ -459,6 +474,46 @@ app.get('/setup/migrate-verification-status', async (req, res) => {
   const db = require('./config/database');
   try {
     await db.query(`ALTER TABLE professional_profiles ALTER COLUMN verification_status TYPE VARCHAR(20)`);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/admin/notify-all', async (req, res) => {
+  const { password, title, body, role } = req.body;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'No autorizado' });
+  const db = require('./config/database');
+  const { createNotification } = require('./modules/notifications/notifications.helper');
+  try {
+    let query = `SELECT id FROM users WHERE is_active = true`;
+    if (role === 'professional') query += ` AND role = 'professional'`;
+    if (role === 'client') query += ` AND role = 'client'`;
+    const users = await db.query(query);
+    for (const u of users.rows) {
+      await createNotification(u.id, title, body, 'broadcast');
+    }
+    res.json({ ok: true, enviados: users.rows.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/setup/migrate-notifications', async (req, res) => {
+  const db = require('./config/database');
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+        user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(200) NOT NULL,
+        body TEXT NOT NULL,
+        type VARCHAR(50) DEFAULT 'system',
+        is_read BOOLEAN DEFAULT false,
+        data JSONB,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
