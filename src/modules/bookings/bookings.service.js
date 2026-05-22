@@ -168,12 +168,16 @@ const updateStatus = async (bookingId, userId, status, rejectionReason = null) =
 };
 
 const cancel = async (bookingId, userId) => {
+  const booking = await db.query(`SELECT client_id, professional_id FROM bookings WHERE id = $1`, [bookingId]);
+  const b = booking.rows[0];
+  const cancelledBy = b?.client_id === userId ? 'client' : 'professional';
+
   const result = await db.query(
-    `UPDATE bookings SET status = 'cancelled', updated_at = NOW()
+    `UPDATE bookings SET status = 'cancelled', updated_at = NOW(), cancelled_by = $3
      WHERE id = $1 AND (client_id = $2 OR professional_id = $2)
      AND status IN ('pending', 'accepted')
      RETURNING *`,
-    [bookingId, userId]
+    [bookingId, userId, cancelledBy]
   );
 
   if (result.rows.length === 0) {

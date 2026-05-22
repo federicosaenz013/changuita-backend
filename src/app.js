@@ -66,7 +66,7 @@ app.get('/admin/dashboard', async (req, res) => {
     const [users, bookings, pendingDni, sanctions, professionals, ingresos, reports] = await Promise.all([
       db.query(`SELECT COUNT(*) FROM users`),
       db.query(`SELECT COUNT(*) FROM bookings`),
-      db.query(`SELECT u.id, u.name, u.email, pp.dni_photo, pp.verification_status FROM professional_profiles pp JOIN users u ON pp.user_id = u.id WHERE pp.dni_photo IS NOT NULL ORDER BY CASE pp.verification_status WHEN 'pending' THEN 1 WHEN 'verified' THEN 2 ELSE 3 END`),
+      db.query(`SELECT u.id, u.name, u.email, u.profile_photo, pp.dni_photo, pp.verification_status FROM professional_profiles pp JOIN users u ON pp.user_id = u.id WHERE pp.dni_photo IS NOT NULL ORDER BY CASE pp.verification_status WHEN 'pending' THEN 1 WHEN 'verified' THEN 2 ELSE 3 END`),
       db.query(`SELECT s.*, u.name FROM sanctions s JOIN users u ON s.professional_id = u.id WHERE s.status = 'active'`),
       db.query(`SELECT u.name, u.email, pp.plan, pp.verification_status, pp.sanctioned, (SELECT COUNT(*) FROM bookings b WHERE b.professional_id = u.id AND b.status = 'completed') as trabajos FROM users u JOIN professional_profiles pp ON pp.user_id = u.id WHERE u.role = 'professional' ORDER BY CASE pp.plan WHEN 'full' THEN 1 WHEN 'medio' THEN 2 WHEN 'basico' THEN 3 ELSE 4 END`),
       db.query(`SELECT plan, COUNT(*) as cantidad FROM professional_profiles WHERE plan != 'free' GROUP BY plan`),
@@ -88,6 +88,7 @@ app.get('/admin/dashboard', async (req, res) => {
         <td style="padding:10px;border-bottom:1px solid #eee;">${p.email}</td>
         <td style="padding:10px;border-bottom:1px solid #eee;">
           <a href="${p.dni_photo}" target="_blank"><img src="${p.dni_photo}" style="width:80px;height:60px;object-fit:cover;border-radius:6px;" /></a>
+          ${p.profile_photo ? `<br><a href="${p.profile_photo}" target="_blank"><img src="${p.profile_photo}" style="width:80px;height:80px;object-fit:cover;border-radius:50%;margin-top:6px;border:2px solid #e2e8f0;" /></a>` : '<br><span style="font-size:11px;color:#94a3b8;">Sin foto</span>'}
         </td>
         <td style="padding:10px;border-bottom:1px solid #eee;">
           <span style="background:${p.verification_status === 'verified' ? '#dcfce7' : p.verification_status === 'rejected' ? '#fee2e2' : '#fef3c7'};padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;">${p.verification_status}</span>
@@ -458,6 +459,16 @@ app.get('/setup/migrate-verification-status', async (req, res) => {
   const db = require('./config/database');
   try {
     await db.query(`ALTER TABLE professional_profiles ALTER COLUMN verification_status TYPE VARCHAR(20)`);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/setup/migrate-cancelled-by', async (req, res) => {
+  const db = require('./config/database');
+  try {
+    await db.query(`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS cancelled_by VARCHAR(20)`);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });

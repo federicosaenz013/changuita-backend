@@ -8,7 +8,8 @@ const checkAndApplySanctions = async (professionalId) => {
   const cancelaciones = await db.query(
     `SELECT COUNT(*) FROM bookings 
      WHERE professional_id = $1 
-       AND status = 'cancelled' 
+       AND status = 'cancelled'
+       AND cancelled_by = 'professional'
        AND updated_at > $2`,
     [professionalId, thirtyDaysAgo]
   );
