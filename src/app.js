@@ -263,8 +263,12 @@ app.get('/admin/verify', async (req, res) => {
   const db = require('./config/database');
   try {
     await db.query(`UPDATE professional_profiles SET verification_status = $1 WHERE user_id = $2`, [action, id]);
-    const { createNotification } = require('./modules/notifications/notifications.helper');
-    await createNotification(id, '✅ Identidad verificada', '¡Tu DNI fue aprobado! Ya podés usar todas las funciones de Changuita.', 'system').catch(() => {});
+    try {
+      const { createNotification } = require('./modules/notifications/notifications.helper');
+      await createNotification(id, '✅ Identidad verificada', '¡Tu DNI fue aprobado! Ya podés usar todas las funciones de Changuita.', 'system');
+    } catch {}
+    if (action === 'verified') {
+      const pushRes = await db.query('SELECT token FROM push_tokens WHERE user_id = $1', [id]);
       if (pushRes.rows[0]?.token) {
         try {
           const { Expo } = require('expo-server-sdk');
