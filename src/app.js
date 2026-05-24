@@ -63,14 +63,15 @@ app.get('/admin/dashboard', async (req, res) => {
   if (password !== ADMIN_PASSWORD) return res.redirect('/admin');
   const db = require('./config/database');
   try {
-    const [users, bookings, pendingDni, sanctions, professionals, ingresos, reports] = await Promise.all([
+    const [users, bookings, pendingDni, sanctions, professionals, ingresos, reports, clients] = await Promise.all([
       db.query(`SELECT COUNT(*) FROM users`),
       db.query(`SELECT COUNT(*) FROM bookings`),
       db.query(`SELECT u.id, u.name, u.email, u.profile_photo, pp.dni_photo, pp.verification_status FROM professional_profiles pp JOIN users u ON pp.user_id = u.id WHERE pp.dni_photo IS NOT NULL ORDER BY CASE pp.verification_status WHEN 'pending' THEN 1 WHEN 'verified' THEN 2 ELSE 3 END`),
       db.query(`SELECT s.*, u.name FROM sanctions s JOIN users u ON s.professional_id = u.id WHERE s.status = 'active'`),
-      db.query(`SELECT u.name, u.email, pp.plan, pp.verification_status, pp.sanctioned, (SELECT COUNT(*) FROM bookings b WHERE b.professional_id = u.id AND b.status = 'completed') as trabajos FROM users u JOIN professional_profiles pp ON pp.user_id = u.id WHERE u.role = 'professional' ORDER BY CASE pp.plan WHEN 'full' THEN 1 WHEN 'medio' THEN 2 WHEN 'basico' THEN 3 ELSE 4 END`),
+      db.query(`SELECT u.id, u.name, u.email, u.profile_photo, u.phone, u.created_at, pp.plan, pp.verification_status, pp.sanctioned, pp.description, pp.location_text, pp.rating, pp.reviews_count, pp.dni_photo, (SELECT COUNT(*) FROM bookings b WHERE b.professional_id = u.id AND b.status = 'completed') as trabajos FROM users u JOIN professional_profiles pp ON pp.user_id = u.id WHERE u.role = 'professional' ORDER BY CASE pp.plan WHEN 'full' THEN 1 WHEN 'medio' THEN 2 WHEN 'basico' THEN 3 ELSE 4 END`),
       db.query(`SELECT plan, COUNT(*) as cantidad FROM professional_profiles WHERE plan != 'free' GROUP BY plan`),
       db.query(`SELECT r.*, u1.name as reporter_name, u2.name as reported_name FROM reports r JOIN users u1 ON u1.id = r.reporter_id JOIN users u2 ON u2.id = r.reported_user_id WHERE r.status = 'pending' ORDER BY r.created_at DESC LIMIT 20`).catch(() => ({ rows: [] })),
+      db.query(`SELECT u.id, u.name, u.email, u.profile_photo, u.phone, u.created_at, (SELECT COUNT(*) FROM bookings b WHERE b.client_id = u.id) as reservas FROM users u WHERE u.role = 'client' ORDER BY u.created_at DESC LIMIT 50`),
     ]);
 
     const precios = { basico: 3000, medio: 5000, full: 7000 };
@@ -82,13 +83,25 @@ app.get('/admin/dashboard', async (req, res) => {
     const filtro = req.query.filtro;
     const dnisFiltrados = filtro ? pendingDni.rows.filter(p => p.verification_status === filtro) : pendingDni.rows;
 
+    const section = (id, title, content) => `
+      <div style="background:white;border-radius:12px;margin-bottom:24px;border:1px solid #e2e8f0;overflow:hidden;">
+        <div onclick="toggle('${id}')" style="padding:20px 24px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;user-select:none;">
+          <h2 style="margin:0;font-size:18px;color:#1e293b;">${title}</h2>
+          <span id="${id}-arrow" style="font-size:18px;color:#64748b;">▼</span>
+        </div>
+        <div id="${id}" style="padding:0 24px 24px;">
+          ${content}
+        </div>
+      </div>
+    `;
+
     const dniRows = dnisFiltrados.map(p => `
       <tr>
         <td style="padding:10px;border-bottom:1px solid #eee;">${p.name}</td>
         <td style="padding:10px;border-bottom:1px solid #eee;">${p.email}</td>
         <td style="padding:10px;border-bottom:1px solid #eee;">
           <a href="${p.dni_photo}" target="_blank"><img src="${p.dni_photo}" style="width:80px;height:60px;object-fit:cover;border-radius:6px;" /></a>
-          ${p.profile_photo ? `<br><a href="${p.profile_photo}" target="_blank"><img src="${p.profile_photo}" style="width:80px;height:80px;object-fit:cover;border-radius:50%;margin-top:6px;border:2px solid #e2e8f0;" /></a>` : '<br><span style="font-size:11px;color:#94a3b8;">Sin foto</span>'}
+          ${p.profile_photo ? `<br><a href="${p.profile_photo}" target="_blank"><img src="${p.profile_photo}" style="width:60px;height:60px;object-fit:cover;border-radius:50%;margin-top:6px;border:2px solid #e2e8f0;" /></a>` : '<br><span style="font-size:11px;color:#94a3b8;">Sin foto</span>'}
         </td>
         <td style="padding:10px;border-bottom:1px solid #eee;">
           <span style="background:${p.verification_status === 'verified' ? '#dcfce7' : p.verification_status === 'rejected' ? '#fee2e2' : '#fef3c7'};padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;">${p.verification_status}</span>
@@ -112,8 +125,11 @@ app.get('/admin/dashboard', async (req, res) => {
     `).join('');
 
     const profRows = professionals.rows.map(p => `
-      <tr>
-        <td style="padding:10px;border-bottom:1px solid #eee;">${p.name}</td>
+      <tr onclick="toggle('prof-${p.id}')" style="cursor:pointer;">
+        <td style="padding:10px;border-bottom:1px solid #eee;">
+          ${p.profile_photo ? `<img src="${p.profile_photo}" style="width:36px;height:36px;border-radius:10px;object-fit:cover;vertical-align:middle;margin-right:8px;">` : ''}
+          ${p.name}
+        </td>
         <td style="padding:10px;border-bottom:1px solid #eee;font-size:12px;color:#64748b;">${p.email}</td>
         <td style="padding:10px;border-bottom:1px solid #eee;">
           <span style="background:${p.plan === 'full' ? '#fef3c7' : p.plan === 'medio' ? '#e9d5ff' : p.plan === 'basico' ? '#dbeafe' : '#f1f5f9'};padding:4px 10px;border-radius:999px;font-size:12px;font-weight:600;text-transform:capitalize;">${p.plan}</span>
@@ -121,6 +137,72 @@ app.get('/admin/dashboard', async (req, res) => {
         <td style="padding:10px;border-bottom:1px solid #eee;text-align:center;">${p.trabajos}</td>
         <td style="padding:10px;border-bottom:1px solid #eee;">
           ${p.sanctioned ? '<span style="color:#ef4444;font-weight:600;font-size:12px;">⚠️ Sancionado</span>' : '<span style="color:#22c55e;font-size:12px;">✓ Activo</span>'}
+        </td>
+        <td style="padding:10px;border-bottom:1px solid #eee;">▼</td>
+      </tr>
+      <tr id="prof-${p.id}" style="display:none;background:#f8fafc;">
+        <td colspan="6" style="padding:16px;border-bottom:1px solid #eee;">
+          <div style="display:flex;gap:24px;flex-wrap:wrap;">
+            <div>
+              ${p.profile_photo ? `<img src="${p.profile_photo}" style="width:80px;height:80px;border-radius:16px;object-fit:cover;">` : '<div style="width:80px;height:80px;background:#e2e8f0;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:24px;">👤</div>'}
+              ${p.dni_photo ? `<br><a href="${p.dni_photo}" target="_blank"><img src="${p.dni_photo}" style="width:80px;height:60px;object-fit:cover;border-radius:6px;margin-top:6px;"></a>` : ''}
+            </div>
+            <div style="flex:1;">
+              <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Email:</strong> ${p.email}</p>
+              <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Teléfono:</strong> ${p.phone || 'No disponible'}</p>
+              <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Zona:</strong> ${p.location_text || 'No especificada'}</p>
+              <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Rating:</strong> ${p.rating || 0} ⭐ (${p.reviews_count || 0} reseñas)</p>
+              <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Descripción:</strong> ${p.description || 'Sin descripción'}</p>
+              <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Miembro desde:</strong> ${new Date(p.created_at).toLocaleDateString('es-AR')}</p>
+              <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Verificación:</strong> ${p.verification_status}</p>
+            </div>
+            <div>
+              <form method="POST" action="/admin/notify-user" style="display:flex;flex-direction:column;gap:8px;min-width:220px;">
+                <input type="hidden" name="password" value="${ADMIN_PASSWORD}" />
+                <input type="hidden" name="user_id" value="${p.id}" />
+                <input name="title" placeholder="Título notificación" required style="padding:8px;border-radius:6px;border:1px solid #e2e8f0;font-size:13px;" />
+                <textarea name="body" placeholder="Mensaje" required style="padding:8px;border-radius:6px;border:1px solid #e2e8f0;font-size:13px;height:60px;resize:none;"></textarea>
+                <button type="submit" style="background:#3898EC;color:white;padding:8px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">Enviar notificación</button>
+              </form>
+            </div>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+
+    const clientRows = clients.rows.map(c => `
+      <tr onclick="toggle('client-${c.id}')" style="cursor:pointer;">
+        <td style="padding:10px;border-bottom:1px solid #eee;">
+          ${c.profile_photo ? `<img src="${c.profile_photo}" style="width:36px;height:36px;border-radius:10px;object-fit:cover;vertical-align:middle;margin-right:8px;">` : ''}
+          ${c.name}
+        </td>
+        <td style="padding:10px;border-bottom:1px solid #eee;font-size:12px;color:#64748b;">${c.email}</td>
+        <td style="padding:10px;border-bottom:1px solid #eee;text-align:center;">${c.reservas}</td>
+        <td style="padding:10px;border-bottom:1px solid #eee;font-size:12px;color:#64748b;">${new Date(c.created_at).toLocaleDateString('es-AR')}</td>
+        <td style="padding:10px;border-bottom:1px solid #eee;">▼</td>
+      </tr>
+      <tr id="client-${c.id}" style="display:none;background:#f8fafc;">
+        <td colspan="5" style="padding:16px;border-bottom:1px solid #eee;">
+          <div style="display:flex;gap:24px;flex-wrap:wrap;">
+            <div>
+              ${c.profile_photo ? `<img src="${c.profile_photo}" style="width:80px;height:80px;border-radius:16px;object-fit:cover;">` : '<div style="width:80px;height:80px;background:#e2e8f0;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:24px;">👤</div>'}
+            </div>
+            <div style="flex:1;">
+              <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Email:</strong> ${c.email}</p>
+              <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Teléfono:</strong> ${c.phone || 'No disponible'}</p>
+              <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Reservas:</strong> ${c.reservas}</p>
+              <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Miembro desde:</strong> ${new Date(c.created_at).toLocaleDateString('es-AR')}</p>
+            </div>
+            <div>
+              <form method="POST" action="/admin/notify-user" style="display:flex;flex-direction:column;gap:8px;min-width:220px;">
+                <input type="hidden" name="password" value="${ADMIN_PASSWORD}" />
+                <input type="hidden" name="user_id" value="${c.id}" />
+                <input name="title" placeholder="Título notificación" required style="padding:8px;border-radius:6px;border:1px solid #e2e8f0;font-size:13px;" />
+                <textarea name="body" placeholder="Mensaje" required style="padding:8px;border-radius:6px;border:1px solid #e2e8f0;font-size:13px;height:60px;resize:none;"></textarea>
+                <button type="submit" style="background:#3898EC;color:white;padding:8px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">Enviar notificación</button>
+              </form>
+            </div>
+          </div>
         </td>
       </tr>
     `).join('');
@@ -140,13 +222,36 @@ app.get('/admin/dashboard', async (req, res) => {
 
     res.send(`
       <html>
-      <head><title>Admin Changuita</title></head>
+      <head>
+        <title>Admin Changuita</title>
+        <script>
+          function toggle(id) {
+            const el = document.getElementById(id);
+            const arrow = document.getElementById(id + '-arrow');
+            if (el) {
+              el.style.display = el.style.display === 'none' ? '' : 'none';
+            }
+            if (arrow) {
+              arrow.textContent = arrow.textContent === '▼' ? '▲' : '▼';
+            }
+          }
+          // Cerrar todas las secciones al cargar
+          window.onload = function() {
+            ['sec-profesionales','sec-clientes','sec-dnis','sec-sanciones','sec-notif','sec-reportes'].forEach(id => {
+              const el = document.getElementById(id);
+              if (el) el.style.display = 'none';
+            });
+          }
+        </script>
+      </head>
       <body style="font-family:Arial;margin:0;background:#f8fafc;">
         <div style="background:#3898EC;padding:20px 32px;color:white;display:flex;justify-content:space-between;align-items:center;">
           <h1 style="margin:0;font-size:22px;">🔧 Panel Admin Changuita</h1>
           <a href="/admin" style="color:rgba(255,255,255,0.8);text-decoration:none;font-size:13px;">Cerrar sesión</a>
         </div>
         <div style="padding:32px;max-width:1200px;margin:0 auto;">
+
+          <!-- Métricas -->
           <div style="display:flex;gap:16px;margin-bottom:32px;flex-wrap:wrap;">
             <div style="background:white;border-radius:12px;padding:20px;flex:1;min-width:180px;border:1px solid #e2e8f0;">
               <div style="font-size:32px;font-weight:700;color:#3898EC;">${users.rows[0].count}</div>
@@ -170,8 +275,7 @@ app.get('/admin/dashboard', async (req, res) => {
             </div>
           </div>
 
-          <div style="background:white;border-radius:12px;padding:24px;margin-bottom:24px;border:1px solid #e2e8f0;">
-            <h2 style="margin:0 0 16px;font-size:18px;color:#1e293b;">👷 Profesionales (${professionals.rows.length})</h2>
+          ${section('sec-profesionales', `👷 Profesionales (${professionals.rows.length})`, `
             <table style="width:100%;border-collapse:collapse;">
               <thead><tr style="background:#f8fafc;">
                 <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Nombre</th>
@@ -179,13 +283,26 @@ app.get('/admin/dashboard', async (req, res) => {
                 <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Plan</th>
                 <th style="padding:10px;text-align:center;font-size:13px;color:#64748b;">Trabajos</th>
                 <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Estado</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;"></th>
               </tr></thead>
-              <tbody>${profRows || '<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No hay profesionales</td></tr>'}</tbody>
+              <tbody>${profRows || '<tr><td colspan="6" style="padding:20px;text-align:center;color:#94a3b8;">No hay profesionales</td></tr>'}</tbody>
             </table>
-          </div>
+          `)}
 
-          <div style="background:white;border-radius:12px;padding:24px;margin-bottom:24px;border:1px solid #e2e8f0;">
-            <h2 style="margin:0 0 16px;font-size:18px;color:#1e293b;">📋 Verificación de DNIs</h2>
+          ${section('sec-clientes', `👤 Clientes (${clients.rows.length})`, `
+            <table style="width:100%;border-collapse:collapse;">
+              <thead><tr style="background:#f8fafc;">
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Nombre</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Email</th>
+                <th style="padding:10px;text-align:center;font-size:13px;color:#64748b;">Reservas</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Miembro desde</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;"></th>
+              </tr></thead>
+              <tbody>${clientRows || '<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No hay clientes</td></tr>'}</tbody>
+            </table>
+          `)}
+
+          ${section('sec-dnis', `📋 Verificación de DNIs`, `
             <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
               <a href="/admin/dashboard?password=${ADMIN_PASSWORD}&filtro=pending" style="padding:6px 14px;border-radius:999px;background:${req.query.filtro==='pending'?'#f59e0b':'#f8fafc'};color:${req.query.filtro==='pending'?'white':'#64748b'};text-decoration:none;font-size:13px;font-weight:600;border:1px solid #e2e8f0;">⏳ Pendientes (${pendingDni.rows.filter(p=>p.verification_status==='pending').length})</a>
               <a href="/admin/dashboard?password=${ADMIN_PASSWORD}&filtro=verified" style="padding:6px 14px;border-radius:999px;background:${req.query.filtro==='verified'?'#22c55e':'#f8fafc'};color:${req.query.filtro==='verified'?'white':'#64748b'};text-decoration:none;font-size:13px;font-weight:600;border:1px solid #e2e8f0;">✅ Verificados (${pendingDni.rows.filter(p=>p.verification_status==='verified').length})</a>
@@ -196,16 +313,15 @@ app.get('/admin/dashboard', async (req, res) => {
               <thead><tr style="background:#f8fafc;">
                 <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Nombre</th>
                 <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Email</th>
-                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">DNI</th>
+                <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Fotos</th>
                 <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Estado</th>
                 <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Acción</th>
               </tr></thead>
               <tbody>${dniRows.length ? dniRows : '<tr><td colspan="5" style="padding:20px;text-align:center;color:#94a3b8;">No hay DNIs en esta categoría</td></tr>'}</tbody>
             </table>
-          </div>
+          `)}
 
-          <div style="background:white;border-radius:12px;padding:24px;margin-bottom:24px;border:1px solid #e2e8f0;">
-            <h2 style="margin:0 0 16px;font-size:18px;color:#1e293b;">⚠️ Sanciones activas</h2>
+          ${section('sec-sanciones', `⚠️ Sanciones activas (${sanctions.rows.length})`, `
             <table style="width:100%;border-collapse:collapse;">
               <thead><tr style="background:#f8fafc;">
                 <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Profesional</th>
@@ -215,11 +331,10 @@ app.get('/admin/dashboard', async (req, res) => {
               </tr></thead>
               <tbody>${sanctionRows || '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94a3b8;">No hay sanciones activas</td></tr>'}</tbody>
             </table>
-          </div>
+          `)}
 
-          <div style="background:white;border-radius:12px;padding:24px;margin-bottom:24px;border:1px solid #e2e8f0;">
-            <h2 style="margin:0 0 16px;font-size:18px;color:#1e293b;">📢 Enviar notificación</h2>
-            <form method="POST" action="/admin/notify-all" style="display:flex;flex-direction:column;gap:12px;">
+          ${section('sec-notif', `📢 Enviar notificación masiva`, `
+            <form method="POST" action="/admin/notify-all" style="display:flex;flex-direction:column;gap:12px;max-width:500px;">
               <input type="hidden" name="password" value="${ADMIN_PASSWORD}" />
               <input name="title" placeholder="Título" required style="padding:10px;border-radius:8px;border:1px solid #e2e8f0;font-size:14px;" />
               <textarea name="body" placeholder="Mensaje" required style="padding:10px;border-radius:8px;border:1px solid #e2e8f0;font-size:14px;height:80px;resize:none;"></textarea>
@@ -230,11 +345,9 @@ app.get('/admin/dashboard', async (req, res) => {
               </select>
               <button type="submit" style="background:#3898EC;color:white;padding:12px;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">Enviar notificación</button>
             </form>
-          </div>
+          `)}
 
-          ${reports.rows.length > 0 ? `
-          <div style="background:white;border-radius:12px;padding:24px;margin-bottom:24px;border:1px solid #e2e8f0;">
-            <h2 style="margin:0 0 16px;font-size:18px;color:#1e293b;">🚩 Reportes pendientes (${reports.rows.length})</h2>
+          ${reports.rows.length > 0 ? section('sec-reportes', `🚩 Reportes pendientes (${reports.rows.length})`, `
             <table style="width:100%;border-collapse:collapse;">
               <thead><tr style="background:#f8fafc;">
                 <th style="padding:10px;text-align:left;font-size:13px;color:#64748b;">Reportado por</th>
@@ -245,13 +358,24 @@ app.get('/admin/dashboard', async (req, res) => {
               </tr></thead>
               <tbody>${reportRows}</tbody>
             </table>
-          </div>
-          ` : ''}
+          `) : ''}
 
         </div>
       </body>
       </html>
     `);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/admin/notify-user', async (req, res) => {
+  const { password, user_id, title, body } = req.body;
+  if (password !== ADMIN_PASSWORD) return res.status(401).json({ error: 'No autorizado' });
+  const { createNotification } = require('./modules/notifications/notifications.helper');
+  try {
+    await createNotification(user_id, title, body, 'broadcast');
+    res.redirect(`/admin/dashboard?password=${ADMIN_PASSWORD}`);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
