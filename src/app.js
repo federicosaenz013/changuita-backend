@@ -658,6 +658,16 @@ app.get('/setup/migrate-cancelled-by', async (req, res) => {
   }
 });
 
+app.get('/setup/verify-existing-users', async (req, res) => {
+  const db = require('./config/database');
+  try {
+    await db.query(`UPDATE users SET email_verified = true WHERE email_verified = false OR email_verified IS NULL`);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/setup/fix-ratings', async (req, res) => {
   const db = require('./config/database');
   try {
