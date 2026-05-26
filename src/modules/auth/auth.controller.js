@@ -11,6 +11,12 @@ const register = async (req, res, next) => {
 
     const result = await authService.register({ name, email, phone, password, role, plan });
 
+    if (result.requiresVerification) {
+      return res.status(201).json({
+        message: 'Te enviamos un email de verificación. Revisá tu bandeja de entrada antes de iniciar sesión.',
+        requiresVerification: true,
+      });
+    }
     res.status(201).json({
       message: 'Usuario registrado correctamente',
       user:         result.user,

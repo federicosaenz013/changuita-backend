@@ -115,6 +115,9 @@ if (!user.email_verified) {
   );
 
   delete user.password_hash;
+  if (EMAIL_VERIFICATION_ENABLED) {
+    return { user, accessToken: null, refreshToken: null, requiresVerification: true };
+  }
   return { user, accessToken, refreshToken };
 };
 
