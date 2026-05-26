@@ -84,7 +84,7 @@ const register = async ({ name, email, phone, password, role, plan }) => {
 
 const login = async ({ email, password }) => {
   const result = await db.query(
-    'SELECT id, name, email, role, password_hash FROM users WHERE email = $1 AND is_active = true',
+    'SELECT id, name, email, role, password_hash, email_verified FROM users WHERE email = $1 AND is_active = true',
     [email]
   );
   if (result.rows.length === 0) {
@@ -98,6 +98,12 @@ const login = async ({ email, password }) => {
   if (!validPassword) {
     const error = new Error('Email o contraseña incorrectos');
     error.status = 401;
+    throw error;
+  }
+
+if (!user.email_verified) {
+    const error = new Error('Verificá tu email antes de iniciar sesión. Revisá tu bandeja de entrada.');
+    error.status = 403;
     throw error;
   }
 
