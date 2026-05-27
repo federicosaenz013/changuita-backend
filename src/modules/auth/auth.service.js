@@ -28,7 +28,11 @@ const register = async ({ name, email, phone, password, role, plan }) => {
     throw error;
   }
 
-  const password_hash = await bcrypt.hash(password, 12);
+  if (password.length < 6 || !/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+    const error = new Error('La contraseña debe tener al menos 6 caracteres, una mayúscula y un número');
+    error.status = 400;
+    throw error;
+  }
   const verificationToken = crypto.randomBytes(32).toString('hex');
   const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
