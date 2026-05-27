@@ -79,6 +79,9 @@ const register = async ({ name, email, phone, password, role, plan }) => {
     [user.id, refreshToken]
   );
 
+  if (EMAIL_VERIFICATION_ENABLED) {
+    return { user, accessToken: null, refreshToken: null, requiresVerification: true };
+  }
   return { user, accessToken, refreshToken };
 };
 
