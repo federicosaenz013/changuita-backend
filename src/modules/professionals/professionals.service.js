@@ -36,7 +36,14 @@ const getAll = async ({ category, lat, lng, radius = 10 }) => {
     )`;
   }
 
-  query += ` ORDER BY pp.rating DESC`;
+  query += ` ORDER BY 
+    CASE pp.plan 
+      WHEN 'full' THEN 1 
+      WHEN 'medio' THEN 2 
+      WHEN 'basico' THEN 3 
+      ELSE 4 
+    END,
+    pp.rating DESC NULLS LAST`;
 
   const result = await db.query(query, params);
   return result.rows;

@@ -119,4 +119,4 @@ const getStatus = async (professionalId) => {
     sanctioned: row.sanctioned || false,
   };
 };
-module.exports = { getPlan, updatePlan, checkExpiredSubscriptions, assignTrial, PLANES };
+module.exports = { getPlan, updatePlan, checkExpiredSubscriptions, assignTrial, getStatus, PLANES };
