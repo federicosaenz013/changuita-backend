@@ -668,6 +668,18 @@ app.get('/setup/verify-existing-users', async (req, res) => {
   }
 });
 
+app.get('/setup/migrate-dni-phone', async (req, res) => {
+  const db = require('./config/database');
+  try {
+    await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS dni VARCHAR(20)`);
+    await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS dni_verified BOOLEAN DEFAULT false`);
+    await db.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_dni_unique ON users (dni) WHERE dni IS NOT NULL`);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 app.get('/setup/fix-ratings', async (req, res) => {
   const db = require('./config/database');
   try {
