@@ -20,7 +20,7 @@ const generateTokens = (userId, role) => {
   return { accessToken, refreshToken };
 };
 
-const register = async ({ name, email, phone, password, role, plan }) => {
+const register = async ({ name, email, phone, password, role, plan, dni }) => {
   const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
   if (existing.rows.length > 0) {
     const error = new Error('Ya existe una cuenta con ese email');
@@ -33,15 +33,39 @@ const register = async ({ name, email, phone, password, role, plan }) => {
     error.status = 400;
     throw error;
   }
+
+  // DNI obligatorio para profesionales
+  if (role === 'professional' && !dni) {
+    const error = new Error('El DNI es obligatorio para registrarse como profesional');
+    error.status = 400;
+    throw error;
+  }
+
+  // Validar formato y unicidad del DNI si fue ingresado
+  if (dni) {
+    if (!/^\d{7,9}$/.test(dni)) {
+      const error = new Error('El DNI debe tener entre 7 y 9 números, sin puntos ni espacios');
+      error.status = 400;
+      throw error;
+    }
+    const dniExiste = await db.query('SELECT id FROM users WHERE dni = $1', [dni]);
+    if (dniExiste.rows.length > 0) {
+      const error = new Error('Ya existe una cuenta registrada con ese DNI');
+      error.status = 409;
+      throw error;
+    }
+  }
+
+  const password_hash = await bcrypt.hash(password, 12);
   const verificationToken = crypto.randomBytes(32).toString('hex');
   const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   const result = await db.query(
-    `INSERT INTO users (name, email, phone, password_hash, role, email_verified, verification_token, verification_token_expires)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO users (name, email, phone, password_hash, role, email_verified, verification_token, verification_token_expires, dni)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING id, name, email, role, created_at`,
     [name, email, phone, password_hash, role || 'client',
-     !EMAIL_VERIFICATION_ENABLED, verificationToken, verificationExpires]
+     !EMAIL_VERIFICATION_ENABLED, verificationToken, verificationExpires, dni || null]
   );
 
   const user = result.rows[0];
@@ -91,7 +115,7 @@ const register = async ({ name, email, phone, password, role, plan }) => {
 
 const login = async ({ email, password }) => {
   const result = await db.query(
-    'SELECT id, name, email, role, password_hash, email_verified FROM users WHERE email = $1 AND is_active = true',
+    'SELECT id, name, email, role, password_hash, email_verified FROM users WHERE (email = $1 OR dni = $1) AND is_active = true',
     [email]
   );
   if (result.rows.length === 0) {
@@ -122,9 +146,6 @@ if (!user.email_verified) {
   );
 
   delete user.password_hash;
-  if (EMAIL_VERIFICATION_ENABLED) {
-    return { user, accessToken: null, refreshToken: null, requiresVerification: true };
-  }
   return { user, accessToken, refreshToken };
 };
 

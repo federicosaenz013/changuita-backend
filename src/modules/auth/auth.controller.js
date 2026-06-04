@@ -3,13 +3,13 @@ const db = require('../../config/database');
 
 const register = async (req, res, next) => {
   try {
-    const { name, email, phone, password, role, plan } = req.body;
+    const { name, email, phone, password, role, plan, dni } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Nombre, email y contraseña son obligatorios' });
     }
 
-    const result = await authService.register({ name, email, phone, password, role, plan });
+    const result = await authService.register({ name, email, phone, password, role, plan, dni });
 
     if (result.requiresVerification) {
       return res.status(201).json({
