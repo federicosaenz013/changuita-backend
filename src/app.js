@@ -68,7 +68,7 @@ app.get('/admin/dashboard', async (req, res) => {
       db.query(`SELECT COUNT(*) FROM bookings`),
       db.query(`SELECT u.id, u.name, u.email, u.profile_photo, pp.dni_photo, pp.verification_status FROM professional_profiles pp JOIN users u ON pp.user_id = u.id WHERE pp.dni_photo IS NOT NULL ORDER BY CASE pp.verification_status WHEN 'pending' THEN 1 WHEN 'verified' THEN 2 ELSE 3 END`),
       db.query(`SELECT s.*, u.name FROM sanctions s JOIN users u ON s.professional_id = u.id WHERE s.status = 'active'`),
-      db.query(`SELECT u.id, u.name, u.email, u.profile_photo, u.phone, u.created_at, pp.plan, pp.verification_status, pp.sanctioned, pp.description, pp.location_text, pp.rating, pp.reviews_count, pp.dni_photo, (SELECT COUNT(*) FROM bookings b WHERE b.professional_id = u.id AND b.status = 'completed') as trabajos FROM users u JOIN professional_profiles pp ON pp.user_id = u.id WHERE u.role = 'professional' ORDER BY CASE pp.plan WHEN 'full' THEN 1 WHEN 'medio' THEN 2 WHEN 'basico' THEN 3 ELSE 4 END`),
+      db.query(`SELECT u.id, u.name, u.email, u.profile_photo, u.phone, u.created_at, u.dni, u.is_active, pp.plan, pp.verification_status, pp.sanctioned, pp.description, pp.location_text, pp.rating, pp.reviews_count, pp.dni_photo, (SELECT COUNT(*) FROM bookings b WHERE b.professional_id = u.id AND b.status = 'completed') as trabajos FROM users u JOIN professional_profiles pp ON pp.user_id = u.id WHERE u.role = 'professional' ORDER BY CASE pp.plan WHEN 'full' THEN 1 WHEN 'medio' THEN 2 WHEN 'basico' THEN 3 ELSE 4 END`),
       db.query(`SELECT plan, COUNT(*) as cantidad FROM professional_profiles WHERE plan != 'free' GROUP BY plan`),
       db.query(`SELECT r.*, u1.name as reporter_name, u2.name as reported_name FROM reports r JOIN users u1 ON u1.id = r.reporter_id JOIN users u2 ON u2.id = r.reported_user_id WHERE r.status = 'pending' ORDER BY r.created_at DESC LIMIT 20`).catch(() => ({ rows: [] })),
       db.query(`SELECT u.id, u.name, u.email, u.profile_photo, u.phone, u.created_at, (SELECT COUNT(*) FROM bookings b WHERE b.client_id = u.id) as reservas FROM users u WHERE u.role = 'client' ORDER BY u.created_at DESC LIMIT 50`),
@@ -155,6 +155,7 @@ app.get('/admin/dashboard', async (req, res) => {
               <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Descripción:</strong> ${p.description || 'Sin descripción'}</p>
               <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Miembro desde:</strong> ${new Date(p.created_at).toLocaleDateString('es-AR')}</p>
               <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Verificación:</strong> ${p.verification_status}</p>
+              <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>N° DNI:</strong> ${p.dni || 'No cargado'}</p>
             </div>
             <div>
               <form method="POST" action="/admin/notify-user" style="display:flex;flex-direction:column;gap:8px;min-width:220px;">
@@ -164,6 +165,10 @@ app.get('/admin/dashboard', async (req, res) => {
                 <textarea name="body" placeholder="Mensaje" required style="padding:8px;border-radius:6px;border:1px solid #e2e8f0;font-size:13px;height:60px;resize:none;"></textarea>
                 <button type="submit" style="background:#3898EC;color:white;padding:8px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">Enviar notificación</button>
               </form>
+              ${p.is_active
+                ? `<a href="/admin/toggle-active?id=${p.id}&action=suspend&password=${ADMIN_PASSWORD}" onclick="return confirm('¿Suspender la cuenta de ${p.name}?')" style="display:block;text-align:center;background:#ef4444;color:white;padding:8px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:700;margin-top:8px;">Suspender cuenta</a>`
+                : `<a href="/admin/toggle-active?id=${p.id}&action=activate&password=${ADMIN_PASSWORD}" style="display:block;text-align:center;background:#22c55e;color:white;padding:8px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:700;margin-top:8px;">Reactivar cuenta</a>`
+              }
             </div>
           </div>
         </td>
@@ -418,6 +423,25 @@ app.get('/admin/verify', async (req, res) => {
         } catch (e) { console.log('Error enviando mail de rechazo:', e.message); }
       }
     }
+    res.redirect(`/admin/dashboard?password=${ADMIN_PASSWORD}`);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/admin/toggle-active', async (req, res) => {
+  const { id, action, password } = req.query;
+  if (password !== ADMIN_PASSWORD) return res.redirect('/admin');
+  const db = require('./config/database');
+  try {
+    const nuevoEstado = action === 'activate';
+    await db.query(`UPDATE users SET is_active = $1 WHERE id = $2`, [nuevoEstado, id]);
+    try {
+      const { createNotification } = require('./modules/notifications/notifications.helper');
+      if (nuevoEstado) {
+        await createNotification(id, 'Cuenta reactivada', 'Tu cuenta de Changuita fue reactivada. Ya podés volver a usar la app.', 'system');
+      }
+    } catch {}
     res.redirect(`/admin/dashboard?password=${ADMIN_PASSWORD}`);
   } catch (err) {
     res.status(500).json({ error: err.message });
