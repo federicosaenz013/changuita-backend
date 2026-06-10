@@ -747,6 +747,20 @@ app.get('/setup/fix-ratings', async (req, res) => {
   }
 });
 
+app.get('/setup/check-subscription', async (req, res) => {
+  const db = require('./config/database');
+  const { user_id } = req.query;
+  try {
+    const [prof, subs] = await Promise.all([
+      db.query(`SELECT plan, verification_status FROM professional_profiles WHERE user_id = $1`, [user_id]),
+      db.query(`SELECT plan, status, expires_at, created_at FROM subscriptions WHERE professional_id = $1 ORDER BY created_at DESC LIMIT 5`, [user_id]),
+    ]);
+    res.json({ professional_profile: prof.rows[0], subscriptions: subs.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.use(require('./middleware/errorHandler'));
 
 module.exports = app;
