@@ -761,6 +761,20 @@ app.get('/setup/check-subscription', async (req, res) => {
   }
 });
 
+app.get('/setup/assign-trial-by-email', async (req, res) => {
+  const db = require('./config/database');
+  const { email } = req.query;
+  try {
+    const user = await db.query(`SELECT id FROM users WHERE email = $1`, [email]);
+    if (!user.rows[0]) return res.status(404).json({ error: 'Usuario no encontrado' });
+    const { assignTrial } = require('./modules/subscriptions/subscriptions.service');
+    const result = await assignTrial(user.rows[0].id, 'free');
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.use(require('./middleware/errorHandler'));
 
 module.exports = app;
