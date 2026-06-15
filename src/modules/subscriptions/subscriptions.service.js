@@ -91,6 +91,19 @@ const assignTrial = async (professionalId, planElegido = 'free') => {
 
   return { dias_trial: diasTrial, expires, plan: planValido };
 };
+
+const changePlanDuringTrial = async (professionalId, plan) => {
+  await db.query(
+    `UPDATE subscriptions SET plan = $1 WHERE professional_id = $2 AND status = 'trial'`,
+    [plan, professionalId]
+  );
+  await db.query(
+    `UPDATE professional_profiles SET plan = $1 WHERE user_id = $2`,
+    [plan, professionalId]
+  );
+  return { plan };
+};
+
 const getStatus = async (professionalId) => {
   const result = await db.query(
     `SELECT s.plan, s.status, s.expires_at, pp.sanctioned
@@ -119,4 +132,4 @@ const getStatus = async (professionalId) => {
     sanctioned: row.sanctioned || false,
   };
 };
-module.exports = { getPlan, updatePlan, checkExpiredSubscriptions, assignTrial, getStatus, PLANES };
+module.exports = { getPlan, updatePlan, checkExpiredSubscriptions, assignTrial, getStatus, changePlanDuringTrial, PLANES };

@@ -26,6 +26,12 @@ const subscribeToPlan = async (req, res, next) => {
       await subscriptionsService.updatePlan(req.user.id, 'free', null, periodo);
       return res.json({ message: 'Plan actualizado a Free' });
     }
+
+    const status = await subscriptionsService.getStatus(req.user.id);
+    if (status.status === 'trial' && !status.vencido) {
+      await subscriptionsService.changePlanDuringTrial(req.user.id, plan);
+      return res.json({ message: `Plan cambiado a ${info.nombre}. Seguís en período de prueba sin cargo.` });
+    }
     const precio = periodo === 'anual' ? info.precio_anual : info.precio_mensual;
     const preference = new Preference(mp);
     const result = await preference.create({
