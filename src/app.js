@@ -73,13 +73,14 @@ app.get('/admin/dashboard', async (req, res) => {
   if (password !== ADMIN_PASSWORD) return res.redirect('/admin');
   const db = require('./config/database');
   try {
-    const [users, bookings, pendingDni, sanctions, professionals, ingresos, reports, clients] = await Promise.all([
+    const [users, bookings, pendingDni, sanctions, professionals, ingresos, subs, reports, clients] = await Promise.all([
       db.query(`SELECT COUNT(*) FROM users`),
       db.query(`SELECT COUNT(*) FROM bookings`),
       db.query(`SELECT u.id, u.name, u.email, u.profile_photo, pp.dni_photo, pp.verification_status FROM professional_profiles pp JOIN users u ON pp.user_id = u.id WHERE pp.dni_photo IS NOT NULL ORDER BY CASE pp.verification_status WHEN 'pending' THEN 1 WHEN 'verified' THEN 2 ELSE 3 END`),
       db.query(`SELECT s.*, u.name FROM sanctions s JOIN users u ON s.professional_id = u.id WHERE s.status = 'active'`),
       db.query(`SELECT u.id, u.name, u.email, u.profile_photo, u.phone, u.created_at, u.dni, u.is_active, u.email_verified, pp.plan, pp.verification_status, pp.sanctioned, pp.description, pp.location_text, pp.rating, pp.reviews_count, pp.dni_photo, (SELECT COUNT(*) FROM bookings b WHERE b.professional_id = u.id AND b.status = 'completed') as trabajos FROM users u JOIN professional_profiles pp ON pp.user_id = u.id WHERE u.role = 'professional' ORDER BY CASE pp.plan WHEN 'full' THEN 1 WHEN 'medio' THEN 2 WHEN 'basico' THEN 3 ELSE 4 END`),
       db.query(`SELECT plan, COUNT(*) as cantidad FROM professional_profiles WHERE plan != 'free' GROUP BY plan`),
+      db.query(`SELECT professional_id, plan, status, expires_at FROM subscriptions WHERE status IN ('trial','active') ORDER BY created_at DESC`),
       db.query(`SELECT r.*, u1.name as reporter_name, u2.name as reported_name FROM reports r JOIN users u1 ON u1.id = r.reporter_id JOIN users u2 ON u2.id = r.reported_user_id WHERE r.status = 'pending' ORDER BY r.created_at DESC LIMIT 20`).catch(() => ({ rows: [] })),
       db.query(`SELECT u.id, u.name, u.email, u.profile_photo, u.phone, u.created_at, (SELECT COUNT(*) FROM bookings b WHERE b.client_id = u.id) as reservas FROM users u WHERE u.role = 'client' ORDER BY u.created_at DESC LIMIT 50`),
     ]);
@@ -134,7 +135,15 @@ app.get('/admin/dashboard', async (req, res) => {
       </tr>
     `).join('');
 
-    const profRows = professionals.rows.map(p => `
+    const profRows = professionals.rows.map(p => {
+      const sub = subs.rows.find(s => s.professional_id === p.id);
+      let trialInfo = 'Sin suscripción registrada';
+      if (sub) {
+        const dias = sub.expires_at ? Math.ceil((new Date(sub.expires_at) - new Date()) / (1000*60*60*24)) : null;
+        const estado = sub.status === 'trial' ? 'Prueba gratis' : 'Activo';
+        trialInfo = `${estado} (${sub.plan}) - ${dias !== null ? (dias >= 0 ? dias + ' días restantes' : 'Vencido') : 'sin vencimiento'}`;
+      }
+      return `
       <tr onclick="toggle('prof-${p.id}')" style="cursor:pointer;">
         <td style="padding:10px;border-bottom:1px solid #eee;">
           ${p.profile_photo ? `<img src="${p.profile_photo}" style="width:36px;height:36px;border-radius:10px;object-fit:cover;vertical-align:middle;margin-right:8px;">` : ''}
@@ -165,6 +174,7 @@ app.get('/admin/dashboard', async (req, res) => {
               <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Descripción:</strong> ${p.description || 'Sin descripción'}</p>
               <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Miembro desde:</strong> ${new Date(p.created_at).toLocaleDateString('es-AR')}</p>
               <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Verificación:</strong> ${p.verification_status}</p>
+              <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Suscripción:</strong> ${trialInfo}</p>
               <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>N° DNI:</strong> ${p.dni || 'No cargado'}</p>
               <p style="margin:0 0 6px;font-size:13px;color:#64748b;"><strong>Email verificado:</strong> ${p.email_verified ? '✅ Sí' : '❌ No'}</p>
               ${!p.email_verified ? `<a href="/admin/verify-email?id=${p.id}&password=${ADMIN_PASSWORD}" style="display:inline-block;background:#3898EC;color:white;padding:5px 12px;border-radius:6px;text-decoration:none;font-size:12px;margin-top:4px;">Verificar email</a>` : ''}
@@ -185,7 +195,7 @@ app.get('/admin/dashboard', async (req, res) => {
           </div>
         </td>
       </tr>
-    `).join('');
+    `;}).join('');
 
     const clientRows = clients.rows.map(c => `
       <tr onclick="toggle('client-${c.id}')" style="cursor:pointer;">
