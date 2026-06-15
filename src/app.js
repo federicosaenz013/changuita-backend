@@ -191,6 +191,7 @@ app.get('/admin/dashboard', async (req, res) => {
                 ? `<a href="/admin/toggle-active?id=${p.id}&action=suspend&password=${ADMIN_PASSWORD}" onclick="return confirm('¿Suspender la cuenta de ${p.name}?')" style="display:block;text-align:center;background:#ef4444;color:white;padding:8px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:700;margin-top:8px;">Suspender cuenta</a>`
                 : `<a href="/admin/toggle-active?id=${p.id}&action=activate&password=${ADMIN_PASSWORD}" style="display:block;text-align:center;background:#22c55e;color:white;padding:8px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:700;margin-top:8px;">Reactivar cuenta</a>`
               }
+              <a href="/admin/anonymize?id=${p.id}&password=${ADMIN_PASSWORD}" onclick="return confirm('¿Eliminar permanentemente los datos personales de ${p.name}? Esta acción no se puede deshacer.')" style="display:block;text-align:center;background:#7f1d1d;color:white;padding:8px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:700;margin-top:8px;">Eliminar cuenta (anonimizar)</a>
             </div>
           </div>
         </td>
@@ -228,6 +229,7 @@ app.get('/admin/dashboard', async (req, res) => {
                 <textarea name="body" placeholder="Mensaje" required style="padding:8px;border-radius:6px;border:1px solid #e2e8f0;font-size:13px;height:60px;resize:none;"></textarea>
                 <button type="submit" style="background:#3898EC;color:white;padding:8px;border:none;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;">Enviar notificación</button>
               </form>
+              <a href="/admin/anonymize?id=${c.id}&password=${ADMIN_PASSWORD}" onclick="return confirm('¿Eliminar permanentemente los datos personales de ${c.name}? Esta acción no se puede deshacer.')" style="display:block;text-align:center;background:#7f1d1d;color:white;padding:8px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:700;margin-top:8px;">Eliminar cuenta (anonimizar)</a>
             </div>
           </div>
         </td>
@@ -458,6 +460,28 @@ app.get('/admin/verify-email', async (req, res) => {
   try {
     await db.query(
       `UPDATE users SET email_verified = true, verification_token = null, verification_token_expires = null WHERE id = $1`,
+      [id]
+    );
+    res.redirect(`/admin/dashboard?password=${ADMIN_PASSWORD}`);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/admin/anonymize', async (req, res) => {
+  const { id, password } = req.query;
+  if (password !== ADMIN_PASSWORD) return res.redirect('/admin');
+  const db = require('./config/database');
+  try {
+    const crypto = require('crypto');
+    const randomEmail = `eliminado_${id}@changuita.app`;
+    const randomPass = await require('bcryptjs').hash(crypto.randomBytes(16).toString('hex'), 12);
+    await db.query(
+      `UPDATE users SET name = 'Usuario eliminado', email = $1, phone = null, dni = null, profile_photo = null, password_hash = $2, is_active = false WHERE id = $3`,
+      [randomEmail, randomPass, id]
+    );
+    await db.query(
+      `UPDATE professional_profiles SET description = null, dni_photo = null, location_text = null WHERE user_id = $1`,
       [id]
     );
     res.redirect(`/admin/dashboard?password=${ADMIN_PASSWORD}`);
