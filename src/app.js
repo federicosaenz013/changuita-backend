@@ -590,6 +590,35 @@ app.get('/setup/notify-incomplete-profiles', async (req, res) => {
   }
 });
 
+app.get('/setup/check-expiring', async (req, res) => {
+  const db = require('./config/database');
+  try {
+    const result = await db.query(`
+      SELECT u.email, u.name, s.plan, s.expires_at
+      FROM subscriptions s
+      JOIN users u ON u.id = s.professional_id
+      WHERE s.status IN ('active','trial')
+        AND s.expires_at IS NOT NULL
+        AND s.expires_at::date = (NOW() + INTERVAL '7 days')::date
+    `);
+    const { Resend } = require('resend');
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    for (const u of result.rows) {
+      try {
+        await resend.emails.send({
+          from: 'Changuita <no-reply@appchanguita.com.ar>',
+          to: u.email,
+          subject: '⏰ Tu plan de Changuita vence en 7 días',
+          html: `<div style="font-family:Arial;max-width:500px;margin:0 auto;padding:20px;"><h2 style="color:#3898EC;">Hola ${u.name}</h2><p>Tu plan <strong>${u.plan}</strong> vence en 7 días.</p><p>Renová desde la app para no perder los beneficios.</p><p style="color:#94a3b8;font-size:13px;">El equipo de Changuita</p></div>`,
+        });
+      } catch (e) { console.log('Error mail vencimiento:', e.message); }
+    }
+    res.json({ ok: true, enviados: result.rows.length });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 app.get('/setup/check-expiring-tomorrow', async (req, res) => {
   const db = require('./config/database');
   try {
