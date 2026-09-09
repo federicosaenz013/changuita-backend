@@ -810,6 +810,18 @@ app.get('/setup/fix-ratings', async (req, res) => {
   }
 });
 
+app.get('/setup/migrate-consent', async (req, res) => {
+  const db = require('./config/database');
+  try {
+    await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS tyc_accepted_at TIMESTAMP`);
+    await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_accepted_at TIMESTAMP`);
+    await db.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS age_confirmed_at TIMESTAMP`);
+    res.json({ ok: true, message: 'Columnas de consentimiento creadas' });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 app.get('/setup/check-subscription', async (req, res) => {
   const db = require('./config/database');
   const { user_id } = req.query;
