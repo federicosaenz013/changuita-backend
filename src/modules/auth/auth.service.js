@@ -20,7 +20,7 @@ const generateTokens = (userId, role) => {
   return { accessToken, refreshToken };
 };
 
-const register = async ({ name, email, phone, password, role, plan, dni }) => {
+const register = async ({ name, email, phone, password, role, plan, dni, acceptedTyc, acceptedPrivacy, confirmedAge }) => {
   const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
   if (existing.rows.length > 0) {
     const error = new Error('Ya existe una cuenta con ese email');
@@ -60,12 +60,21 @@ const register = async ({ name, email, phone, password, role, plan, dni }) => {
   const verificationToken = crypto.randomBytes(32).toString('hex');
   const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
+  if (!acceptedTyc || !acceptedPrivacy || !confirmedAge) {
+    const error = new Error('Tenés que aceptar los términos, la política de privacidad y confirmar que sos mayor de 18 años');
+    error.status = 400;
+    throw error;
+  }
+
+  const ahora = new Date();
+
   const result = await db.query(
-    `INSERT INTO users (name, email, phone, password_hash, role, email_verified, verification_token, verification_token_expires, dni)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `INSERT INTO users (name, email, phone, password_hash, role, email_verified, verification_token, verification_token_expires, dni, tyc_accepted_at, privacy_accepted_at, age_confirmed_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
      RETURNING id, name, email, role, created_at`,
     [name, email, phone, password_hash, role || 'client',
-     !EMAIL_VERIFICATION_ENABLED, verificationToken, verificationExpires, dni || null]
+     !EMAIL_VERIFICATION_ENABLED, verificationToken, verificationExpires, dni || null,
+     ahora, ahora, ahora]
   );
 
   const user = result.rows[0];
